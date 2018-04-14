@@ -3,7 +3,7 @@ from persistqueue import sqlbase
 import sqlite3
 
 
-class PersistentBlockingDictionary(sqlbase.SQLiteBase, dict):
+class PersistentAtomicDictionary(sqlbase.SQLiteBase, dict):
 
     _TABLE_NAME = 'dict'
     _KEY_COLUMN = 'key'
@@ -23,7 +23,7 @@ class PersistentBlockingDictionary(sqlbase.SQLiteBase, dict):
     _SQL_COUNT_KEYS = 'DELETE FROM {table_name} WHERE {key_column}=\'{key}\''
 
     def __init__(self, path):
-        super(PersistentBlockingDictionary, self).__init__(path, name='persistent_dictionary', multithreading=True)
+        super(PersistentAtomicDictionary, self).__init__(path, name='persistent_dictionary', multithreading=True)
 
     def check_and_add(self, key, new_value, update=True):
         with self.tran_lock:
@@ -100,8 +100,6 @@ class PersistentBlockingDictionary(sqlbase.SQLiteBase, dict):
         return self._count()
 
     def _contains(self, transaction, item):
-        #select_query = self._SQL_SELECT_KEY.format(key_column=item, table_name=self._table_name)
-        #result = transaction.execute(select_query).fetchone()
         result = self._select_with_transaction(transaction, op='=', column=item)
         return False if result is None else True
 
