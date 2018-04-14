@@ -2,25 +2,18 @@
 import argparse
 import logging
 import os
-import pickle
-import sqlite3
 import tempfile
 import threading
 import time
-import time as _time
-
-from filelock import SoftFileLock
 from os.path import expanduser
-from pathtools.patterns import match_path
-from persistqueue import UniqueQ
-from watchdog.events import EVENT_TYPE_CREATED
-from watchdog.events import FileSystemEventHandler
+from lib.persistent_dictionary import PersistentBlockingDictionary
+from lib.event_handlers import MediaFilesEventHandler
+
 from watchdog.observers import Observer
 
 DEFAULT_INCLUDE_PATTERN = ['*.mp4', '*.mpg', '*.mov', '*.mkv', '*.avi']
 
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)-15s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)-15s - %(message)s')
 
 
 def is_filesystem_case_sensitive():
@@ -54,59 +47,28 @@ case_sensitive = args.case_sensitive
 lock = threading.Lock()
 current_processing_file_path = None
 
-
-class UniqueQueue(UniqueQ):
-    def put(self, item):
-        updated = False
-        obj = pickle.dumps(item)
-        try:
-            self._insert_into(obj, _time.time())
-            updated = True
-        except sqlite3.IntegrityError:
-            pass
-        else:
-            self.total += 1
-            self.put_event.set()
-        return updated
-
-
 queue_store_directory = os.path.join(queue_directory, '.handbreak-auto-processing')
-queue_store_lock_file = os.path.join(queue_store_directory, "data.lock")
-queue = UniqueQueue(queue_store_directory, auto_commit=True, multithreading=True)
+
+processing_dict = PersistentBlockingDictionary(queue_store_directory)
 
 
-class MediaFilesEventHandler(FileSystemEventHandler):
-    def on_any_event(self, event):
-        if not event.is_directory \
-                and match_path(event.src_path,
-                               included_patterns=include_pattern,
-                               excluded_patterns=exclude_pattern,
-                               case_sensitive=case_sensitive) \
-                and event.event_type == EVENT_TYPE_CREATED:
-            try:
-                lock = SoftFileLock(queue_store_lock_file)
-                with lock:
-                    if queue.put(event.src_path):
-                        logging.info("File [{}] added to processing queue".format(event.src_path))
-            except Exception:
-                logging.exception("An error occurred during adding of [{}] to processing queue".format(event.src_path))
+def list_media_files():
+    logging.info("Current processing queue:")
+    logging.info("Media file path : Processing")
+    for media_file_path in processing_dict.iterkeys():
+        logging.info("{} : {}".format(media_file_path, processing_dict[media_file_path]))
 
 
 def process_media_file():
     global current_processing_file_path
-    try:
-        lock = SoftFileLock(queue_store_lock_file)
-        with lock:
-            if queue.size > 0:
-                current_processing_file_path = queue.get()
-    except Exception:
-        logging.exception("Can't obtain media file to process")
+    get_media_file()
 
     if current_processing_file_path is not None:
         try:
             logging.info("Processing file [{}]".format(current_processing_file_path))
             time.sleep(30)
             logging.info("File [{}] processed successfully".format(current_processing_file_path))
+            del processing_dict[current_processing_file_path]
             current_processing_file_path = None
         except Exception:
             logging.info(
@@ -114,22 +76,37 @@ def process_media_file():
             return_current_processing_file_path()
 
 
+def get_media_file():
+    global current_processing_file_path
+    try:
+        for media_file_path in processing_dict.iterkeys():
+            if not processing_dict[media_file_path]:
+                current_processing_file_path = media_file_path
+                processing_dict[media_file_path] = True
+                break
+    except Exception:
+        logging.exception("Can't obtain media file to process")
+
+
 def return_current_processing_file_path():
     global current_processing_file_path
     if current_processing_file_path is not None:
-        lock = SoftFileLock(queue_store_lock_file)
-        with lock:
-            if queue.put(current_processing_file_path):
-                logging.info("File [{}] returned to processing queue".format(current_processing_file_path))
+        processing_dict[current_processing_file_path] = False
+        logging.info("File [{}] returned to processing queue".format(current_processing_file_path))
         current_processing_file_path = None
 
 
 if __name__ == "__main__":
-    event_handler = MediaFilesEventHandler()
+    logging.info("Watching directories: {}".format(watch_directories))
+    logging.info("Include patterns: {}".format(include_pattern))
+    logging.info("Exclude patterns: {}".format(exclude_pattern))
+    logging.info("Case sensitive: [{}]".format(case_sensitive))
+
+    list_media_files()
+    event_handler = MediaFilesEventHandler(processing_dict, include_pattern, exclude_pattern, case_sensitive)
 
     for watch_directory in watch_directories:
         observer = Observer()
-
         observer.schedule(event_handler, watch_directory, recursive=True)
         observer.start()
     try:
