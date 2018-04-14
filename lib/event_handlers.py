@@ -25,8 +25,7 @@ class MediaFilesEventHandler(FileSystemEventHandler):
                                case_sensitive=self.case_sensitive) \
                 and event.event_type == EVENT_TYPE_CREATED:
             try:
-                if event.src_path not in self.processing_dictionary:
-                    self.processing_dictionary[event.src_path] = False
+                if not self.processing_dictionary.check_and_add(event.src_path, False, False):
                     logging.info("File [{}] added to processing queue".format(event.src_path))
             except Exception:
                 logging.exception("An error occurred during adding of [{}] to processing queue".format(event.src_path))

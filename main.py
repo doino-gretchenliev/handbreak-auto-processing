@@ -79,11 +79,7 @@ def process_media_file():
 def get_media_file():
     global current_processing_file_path
     try:
-        for media_file_path in processing_dict.iterkeys():
-            if not processing_dict[media_file_path]:
-                current_processing_file_path = media_file_path
-                processing_dict[media_file_path] = True
-                break
+        current_processing_file_path = processing_dict.get_by_value_and_update(False, True, True)
     except Exception:
         logging.exception("Can't obtain media file to process")
 
