@@ -1,10 +1,10 @@
 import pickle
-from persistqueue import sqlbase
 import sqlite3
+
+from persistqueue import sqlbase
 
 
 class PersistentAtomicDictionary(sqlbase.SQLiteBase, dict):
-
     _TABLE_NAME = 'dict'
     _KEY_COLUMN = 'key'
     _SQL_CREATE = ('CREATE TABLE IF NOT EXISTS {table_name} ('
@@ -14,7 +14,7 @@ class PersistentAtomicDictionary(sqlbase.SQLiteBase, dict):
                    'WHERE {key_column} = ?')
 
     _SQL_SELECT_WHERE = ('SELECT {key_column}, data FROM {table_name} '
-                        'WHERE {key_column}{op}\'{column}\'')
+                         'WHERE {key_column}{op}\'{column}\'')
 
     _SQL_UPDATE = 'UPDATE {table_name} SET data = ? WHERE {key_column} = ?'
 

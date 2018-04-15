@@ -1,20 +1,20 @@
 #!/usr/bin/env python2
 import argparse
 import logging
-import sys
 import logging.handlers
 import os
+import signal
+import sys
 import tempfile
 import threading
 import time
-import signal
+
 from os.path import expanduser
-from lib.system_calls_thread import SystemCallThread
-
-from lib.persistent_dictionary import PersistentAtomicDictionary
-from lib.event_handlers import MediaFilesEventHandler
-
 from watchdog.observers import Observer
+
+from lib.event_handlers import MediaFilesEventHandler
+from lib.interruptable_thread import InterruptableThread
+from lib.persistent_dictionary import PersistentAtomicDictionary
 
 DEFAULT_INCLUDE_PATTERN = ['*.mp4', '*.mpg', '*.mov', '*.mkv', '*.avi']
 
@@ -52,11 +52,11 @@ parser.add_argument("-v", "--verbose", dest="verbose_count", action="count", def
 parser.add_argument('-m', '--max-log-size', help='Max log size in MB; set to 0 to disable log file rotating\n'
                                                  '(default: 100)', default=0)
 parser.add_argument('-k', '--max-log-file-to-keep', help='Max number of log files to keep\n'
-                                                 '(default: 5)', default=5)
+                                                         '(default: 5)', default=5)
 
 parser.add_argument('-c', '--handbreak-command', help='Handbreak command to execute', required=True)
 parser.add_argument('-t', '--handbreak-timeout', help='Timeout of Handbreak command(hours)\n'
-                                                       '(default: 15)', default=15)
+                                                      '(default: 15)', default=15)
 parser.add_argument('-f', '--file-extension', help='Output file extension\n'
                                                    '(default: mp4)', default='mp4')
 parser.add_argument('-d', '--delete', help='Delete original file', action='store_true')
@@ -90,7 +90,6 @@ file_handler.setFormatter(formatter)
 logger.addHandler(syslog_handler)
 logger.addHandler(file_handler)
 
-
 lock = threading.Lock()
 current_processing_file_path = None
 
@@ -99,6 +98,7 @@ queue_store_directory = os.path.join(queue_directory, '.handbreak-auto-processin
 processing_dict = PersistentAtomicDictionary(queue_store_directory)
 
 system_call_thread = None
+
 
 def list_media_files():
     logger.info("Current processing queue:")
@@ -130,7 +130,7 @@ def execute_handbreak_command(file):
     transcoded_file = os.path.join(file_directory, "{}_transcoded.{}".format(file_name, file_extension))
     log_file = os.path.join(file_directory, "{}_transcoding.log".format(file_name))
 
-    command = "{handbreak_command} -input {input_file} -output {output_file}"\
+    command = "{handbreak_command} -input {input_file} -output {output_file}" \
         .format(handbreak_command=handbreak_command,
                 input_file=file,
                 output_file=transcoded_file
@@ -138,10 +138,13 @@ def execute_handbreak_command(file):
     logger.debug(command)
 
     global system_call_thread
-    system_call_thread = SystemCallThread(log_file, "ping 8.8.8.8", handbreak_timeout)
+    system_call_thread = InterruptableThread(log_file, "ping 8.8.8.8", handbreak_timeout)
     system_call_thread.start()
     system_call_thread.join()
 
+    if system_call_thread.interrupted:
+        logger.info("Handbreak processes interrupted softly")
+        clean()
     if system_call_thread.exit_code == -9:
         raise Exception("Handbreak processes killed after {} hours".format(handbreak_timeout / 60 / 60))
     elif system_call_thread.exit_code != 0:
@@ -169,7 +172,11 @@ def return_current_processing_file_path():
         current_processing_file_path = None
 
 
-def clean(signal, frame):
+def clean_handler(signal, frame):
+    clean()
+
+
+def clean():
     logger.info("Processes interrupted by the user exiting...")
     return_current_processing_file_path()
     observer.stop()
@@ -181,9 +188,9 @@ def clean(signal, frame):
 
 
 if __name__ == "__main__":
-    signal.signal(signal.SIGTERM, clean)
-    signal.signal(signal.SIGINT, clean)
+    signal.signal(signal.SIGINT, clean_handler)
 
+    logger.info("Handbreak media processor started pid: [{}]".format(os.getpid()))
     logger.info("Watching directories: {}".format(watch_directories))
     logger.info("Include patterns: {}".format(include_pattern))
     logger.info("Exclude patterns: {}".format(exclude_pattern))
