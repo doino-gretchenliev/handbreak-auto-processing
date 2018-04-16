@@ -10,10 +10,13 @@ import threading
 import time
 
 from os.path import expanduser
+from watchdog.events import EVENT_TYPE_CREATED
+from watchdog.events import FileSystemEvent
 from watchdog.observers import Observer
 
 from lib.event_handlers import MediaFilesEventHandler
 from lib.interruptable_thread import InterruptableThread
+from lib.media_file_states import MediaFileStates
 from lib.persistent_dictionary import PersistentAtomicDictionary
 
 DEFAULT_INCLUDE_PATTERN = ['*.mp4', '*.mpg', '*.mov', '*.mkv', '*.avi']
@@ -35,8 +38,28 @@ def set_log_level_from_verbose(verbose_count):
 
 
 parser = argparse.ArgumentParser(description='Watch for new media files and automatically process them with Handbreak')
-parser.add_argument('-w', '--watch-directory', help='Directory to watch for new media files', required=True,
-                    action='append')
+list_watch_group = parser.add_mutually_exclusive_group(required=True)
+list_command_group = parser.add_mutually_exclusive_group(required=True)
+
+list_arg = list_watch_group.add_argument('-l', '--list-processing-queue', help='Lists processing queue and exits',
+                                         action='store_true')
+parser.add_argument('-n', '--retry-media-file',
+                    help="Change media file state from [{}] to [{}]".format(MediaFileStates.FAILED.value,
+                                                                            MediaFileStates.WAITING.value))
+parser.add_argument('-a', '--retry-all-media-files',
+                    help="Change all media file states from [{}] to [{}]".format(MediaFileStates.FAILED.value,
+                                                                                 MediaFileStates.WAITING.value),
+                    action='store_true')
+
+parser.add_argument('-p', '--initial-processing',
+                    help="Find and process all files in listed in watch directories(excludes failed media files)",
+                    action='store_true')
+parser.add_argument('-r', '--reprocess',
+                    help="Whether to reprocess files already in processing queue with state [{}]".format(
+                        MediaFileStates.PROCESSED.value), action='store_true')
+
+list_watch_group.add_argument('-w', '--watch-directory', help='Directory to watch for new media files',
+                              action='append')
 parser.add_argument('-q', '--queue-directory', help='Directory to store processing queue\n'
                                                     '(default: {})'.format(expanduser("~")), default=expanduser("~"))
 parser.add_argument('-i', '--include-pattern', help='Include for processing files matching include patterns\n'
@@ -54,12 +77,14 @@ parser.add_argument('-m', '--max-log-size', help='Max log size in MB; set to 0 t
 parser.add_argument('-k', '--max-log-file-to-keep', help='Max number of log files to keep\n'
                                                          '(default: 5)', default=5)
 
-parser.add_argument('-c', '--handbreak-command', help='Handbreak command to execute', required=True)
+list_command_group.add_argument('-c', '--handbreak-command', help='Handbreak command to execute')
 parser.add_argument('-t', '--handbreak-timeout', help='Timeout of Handbreak command(hours)\n'
                                                       '(default: 15)', default=15)
 parser.add_argument('-f', '--file-extension', help='Output file extension\n'
                                                    '(default: mp4)', default='mp4')
 parser.add_argument('-d', '--delete', help='Delete original file', action='store_true')
+
+list_command_group._group_actions.append(list_arg)
 args = parser.parse_args()
 
 watch_directories = args.watch_directory
@@ -74,6 +99,11 @@ handbreak_command = args.handbreak_command
 handbreak_timeout = float(args.handbreak_timeout) * 60 * 60
 file_extension = args.file_extension
 delete = args.delete
+list_processing_queue = args.list_processing_queue
+retry_media_file = args.retry_media_file
+retry_all_media_files = args.retry_all_media_files
+initial_processing = args.initial_processing
+reprocess = args.reprocess
 
 # Logging setup
 formatter = logging.Formatter('[%(asctime)-15s] [%(threadName)s] [%(levelname)s]: %(message)s')
@@ -102,9 +132,8 @@ system_call_thread = None
 
 def list_media_files():
     logger.info("Current processing queue:")
-    logger.info("[Media file path : Processing]")
     for media_file_path in processing_dict.iterkeys():
-        logger.info("[{} : {}]".format(media_file_path, processing_dict[media_file_path]))
+        logger.info("[{} : {}]".format(media_file_path, processing_dict[media_file_path].value))
 
 
 def process_media_file():
@@ -116,12 +145,13 @@ def process_media_file():
             logger.info("Processing file [{}]".format(current_processing_file_path))
             execute_handbreak_command(current_processing_file_path)
             logger.info("File [{}] processed successfully".format(current_processing_file_path))
-            del processing_dict[current_processing_file_path]
+            processing_dict[current_processing_file_path] = MediaFileStates.PROCESSED
             current_processing_file_path = None
         except Exception:
             logger.exception(
-                "File [{}] returning to processing queue after processing error".format(current_processing_file_path))
-            return_current_processing_file_path()
+                "File [{}] returning to processing queue after processing error, status [{}]".format(
+                    current_processing_file_path, MediaFileStates.FAILED.value))
+            return_current_processing_file_path(MediaFileStates.FAILED)
 
 
 def execute_handbreak_command(file):
@@ -138,7 +168,7 @@ def execute_handbreak_command(file):
     logger.debug(command)
 
     global system_call_thread
-    system_call_thread = InterruptableThread(log_file, "ping 8.8.8.8", handbreak_timeout)
+    system_call_thread = InterruptableThread(log_file, "echso Done", handbreak_timeout)
     system_call_thread.start()
     system_call_thread.join()
 
@@ -159,16 +189,17 @@ def execute_handbreak_command(file):
 def get_media_file():
     global current_processing_file_path
     try:
-        current_processing_file_path = processing_dict.get_by_value_and_update(False, True, True)
+        current_processing_file_path = processing_dict.get_by_value_and_update(MediaFileStates.WAITING,
+                                                                               MediaFileStates.PROCESSING, True)
     except Exception:
         logger.exception("Can't obtain media file to process")
 
 
-def return_current_processing_file_path():
+def return_current_processing_file_path(media_file_state):
     global current_processing_file_path
     if current_processing_file_path is not None:
-        processing_dict[current_processing_file_path] = False
-        logger.info("File [{}] returned to processing queue".format(current_processing_file_path))
+        processing_dict[current_processing_file_path] = media_file_state
+        logger.info("File [{}] returned to processing queue, status [{}]".format(current_processing_file_path, media_file_state.value))
         current_processing_file_path = None
 
 
@@ -178,7 +209,7 @@ def clean_handler(signal, frame):
 
 def clean():
     logger.info("Processes interrupted by the user exiting...")
-    return_current_processing_file_path()
+    return_current_processing_file_path(MediaFileStates.WAITING)
     observer.stop()
     observer.join()
     global system_call_thread
@@ -187,7 +218,38 @@ def clean():
     exit(0)
 
 
+def retry_media_files():
+    if retry_all_media_files:
+        logger.info("Retrying all media files")
+        processing_dict.get_by_value_and_update(MediaFileStates.FAILED, MediaFileStates.WAITING, False)
+    else:
+        processing_dict[retry_media_file] = MediaFileStates.WAITING
+    list_media_files()
+
+
+def initial_processing(event_handler):
+    for watch_directory in watch_directories:
+        for root, dir_names, file_names in os.walk(watch_directory):
+            for filename in file_names:
+                file_path = os.path.join(root, filename).decode('utf-8')
+                if file_path not in processing_dict or (
+                        file_path in processing_dict
+                        and processing_dict[file_path] != MediaFileStates.FAILED):
+                    file_event = FileSystemEvent(file_path)
+                    file_event.is_directory = False
+                    file_event.event_type = EVENT_TYPE_CREATED
+                    event_handler.on_any_event(file_event)
+
+
 if __name__ == "__main__":
+    if list_processing_queue:
+        if len(processing_dict) > 0:
+            list_media_files()
+        exit(0)
+
+    if retry_all_media_files or retry_media_file:
+        retry_media_files()
+
     signal.signal(signal.SIGINT, clean_handler)
 
     logger.info("Handbreak media processor started pid: [{}]".format(os.getpid()))
@@ -198,7 +260,11 @@ if __name__ == "__main__":
 
     if len(processing_dict) > 0:
         list_media_files()
-    event_handler = MediaFilesEventHandler(processing_dict, include_pattern, exclude_pattern, case_sensitive)
+
+    event_handler = MediaFilesEventHandler(processing_dict, include_pattern, exclude_pattern, case_sensitive, reprocess)
+
+    if initial_processing:
+        initial_processing(event_handler)
 
     for watch_directory in watch_directories:
         observer = Observer()
