@@ -8,6 +8,7 @@ import sys
 import tempfile
 import threading
 import time
+import shlex
 
 from os.path import expanduser
 from watchdog.events import EVENT_TYPE_CREATED
@@ -15,11 +16,13 @@ from watchdog.events import FileSystemEvent
 from watchdog.observers import Observer
 
 from lib.event_handlers import MediaFilesEventHandler
-from lib.interruptable_thread import InterruptableThread
+from lib.exceptions import MediaProcessingNonRecoverableError
+from lib.media_file_processing_thread import MediaProcessingThread
 from lib.media_file_states import MediaFileStates
 from lib.persistent_dictionary import PersistentAtomicDictionary
 
 DEFAULT_INCLUDE_PATTERN = ['*.mp4', '*.mpg', '*.mov', '*.mkv', '*.avi']
+SCAN_FOR_NEW_MEDIA_FILES_FOR_PROCESSING_TIMEOUT = 10
 
 
 def is_filesystem_case_sensitive():
@@ -128,6 +131,7 @@ queue_store_directory = os.path.join(queue_directory, '.handbreak-auto-processin
 processing_dict = PersistentAtomicDictionary(queue_store_directory)
 
 system_call_thread = None
+observers = []
 
 
 def list_media_files():
@@ -136,83 +140,14 @@ def list_media_files():
         logger.info("[{} : {}]".format(media_file_path, processing_dict[media_file_path].value))
 
 
-def process_media_file():
-    global current_processing_file_path
-    get_media_file()
-
-    if current_processing_file_path is not None:
-        try:
-            logger.info("Processing file [{}]".format(current_processing_file_path))
-            execute_handbreak_command(current_processing_file_path)
-            logger.info("File [{}] processed successfully".format(current_processing_file_path))
-            processing_dict[current_processing_file_path] = MediaFileStates.PROCESSED
-            current_processing_file_path = None
-        except Exception:
-            logger.exception(
-                "File [{}] returning to processing queue after processing error, status [{}]".format(
-                    current_processing_file_path, MediaFileStates.FAILED.value))
-            return_current_processing_file_path(MediaFileStates.FAILED)
-
-
-def execute_handbreak_command(file):
-    file_directory = os.path.dirname(file)
-    file_name = os.path.splitext(os.path.basename(file))[0]
-    transcoded_file = os.path.join(file_directory, "{}_transcoded.{}".format(file_name, file_extension))
-    log_file = os.path.join(file_directory, "{}_transcoding.log".format(file_name))
-
-    command = "{handbreak_command} -input {input_file} -output {output_file}" \
-        .format(handbreak_command=handbreak_command,
-                input_file=file,
-                output_file=transcoded_file
-                )
-    logger.debug(command)
-
-    global system_call_thread
-    system_call_thread = InterruptableThread(log_file, "echso Done", handbreak_timeout)
-    system_call_thread.start()
-    system_call_thread.join()
-
-    if system_call_thread.interrupted:
-        logger.info("Handbreak processes interrupted softly")
-        clean()
-    if system_call_thread.exit_code == -9:
-        raise Exception("Handbreak processes killed after {} hours".format(handbreak_timeout / 60 / 60))
-    elif system_call_thread.exit_code != 0:
-        raise Exception("Handbreak processes failed. Please, check the transcoding log file [{}]".format(log_file))
-    else:
-        os.remove(log_file)
-        if delete:
-            os.remove(file)
-    system_call_thread = None
-
-
-def get_media_file():
-    global current_processing_file_path
-    try:
-        current_processing_file_path = processing_dict.get_by_value_and_update(MediaFileStates.WAITING,
-                                                                               MediaFileStates.PROCESSING, True)
-    except Exception:
-        logger.exception("Can't obtain media file to process")
-
-
-def return_current_processing_file_path(media_file_state):
-    global current_processing_file_path
-    if current_processing_file_path is not None:
-        processing_dict[current_processing_file_path] = media_file_state
-        logger.info("File [{}] returned to processing queue, status [{}]".format(current_processing_file_path, media_file_state.value))
-        current_processing_file_path = None
-
-
 def clean_handler(signal, frame):
-    clean()
-
-
-def clean():
-    logger.info("Processes interrupted by the user exiting...")
-    return_current_processing_file_path(MediaFileStates.WAITING)
-    observer.stop()
-    observer.join()
+    global observers
     global system_call_thread
+
+    logger.info("Processes interrupted by the user exiting...")
+    for observer in observers:
+        observer.stop()
+        observer.join()
     if system_call_thread:
         system_call_thread.join()
     exit(0)
@@ -251,6 +186,8 @@ if __name__ == "__main__":
         retry_media_files()
 
     signal.signal(signal.SIGINT, clean_handler)
+    signal.signal(signal.SIGTERM, clean_handler)
+
 
     logger.info("Handbreak media processor started pid: [{}]".format(os.getpid()))
     logger.info("Watching directories: {}".format(watch_directories))
@@ -266,14 +203,21 @@ if __name__ == "__main__":
     if initial_processing:
         initial_processing(event_handler)
 
+    global observers
     for watch_directory in watch_directories:
         observer = Observer()
         observer.schedule(event_handler, watch_directory, recursive=True)
+        observers.append(observer)
         observer.start()
 
+    global system_call_thread
     while True:
-        with lock:
-            process = threading.Thread(target=process_media_file(), args=())
-            process.start()
-            process.join()
-        time.sleep(10)
+        system_call_thread = MediaProcessingThread(processing_dict,
+                                                   handbreak_command,
+                                                   handbreak_timeout,
+                                                   file_extension,
+                                                   delete)
+        system_call_thread.start()
+        while system_call_thread.isAlive():
+            pass
+        time.sleep(SCAN_FOR_NEW_MEDIA_FILES_FOR_PROCESSING_TIMEOUT)

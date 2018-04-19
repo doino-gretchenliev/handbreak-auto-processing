@@ -1,9 +1,11 @@
 import logging
 import sys
-from lib.media_file_states import MediaFileStates
+
 from pathtools.patterns import match_path
 from watchdog.events import EVENT_TYPE_CREATED
 from watchdog.events import FileSystemEventHandler
+
+from lib.media_file_states import MediaFileStates
 
 logger = logging.getLogger(__name__)
 

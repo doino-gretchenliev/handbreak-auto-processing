@@ -6,5 +6,3 @@ class MediaFileStates(Enum):
     PROCESSED = "processed"
     WAITING = "waiting"
     FAILED = "failed"
-
-
