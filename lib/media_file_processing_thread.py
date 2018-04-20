@@ -70,7 +70,7 @@ class MediaProcessingThread(Thread):
                     )
         logger.debug(command)
 
-        self.system_call_thread = InterruptableSystemCommandThread(log_file, "ping 8.8.8.8")
+        self.system_call_thread = InterruptableSystemCommandThread(log_file, command)
 
         timer = Timer(self.handbreak_timeout, self.system_call_thread.kill)
         timer.start()
