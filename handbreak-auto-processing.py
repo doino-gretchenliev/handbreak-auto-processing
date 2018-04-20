@@ -33,13 +33,6 @@ def is_filesystem_case_sensitive():
     return result
 
 
-def set_log_level_from_verbose(verbose_count):
-    if not verbose_count:
-        return logging.INFO
-    elif verbose_count == 1:
-        return logging.DEBUG
-
-
 parser = argparse.ArgumentParser(description='Watch for new media files and automatically process them with Handbreak')
 list_watch_group = parser.add_mutually_exclusive_group(required=True)
 list_command_group = parser.add_mutually_exclusive_group(required=True)
@@ -73,8 +66,8 @@ parser.add_argument('-s', '--case-sensitive', help='Whether pattern matching sho
                                                    '(default: depends on the filesystem)',
                     default=is_filesystem_case_sensitive(), action='store_true')
 
-parser.add_argument("-v", "--verbose", dest="verbose_count", action="count", default=0,
-                    help="Enable verbose log output(increases log verbosity for each occurence)")
+parser.add_argument("-v", "--verbose", action="store_true", default=False,
+                    help="Enable verbose log output")
 parser.add_argument('-m', '--max-log-size', help='Max log size in MB; set to 0 to disable log file rotating\n'
                                                  '(default: 100)', default=0)
 parser.add_argument('-k', '--max-log-file-to-keep', help='Max number of log files to keep\n'
@@ -97,7 +90,11 @@ exclude_pattern = args.exclude_pattern
 case_sensitive = args.case_sensitive
 max_log_size = args.max_log_size
 max_log_file_to_keep = args.max_log_file_to_keep
-verbose = set_log_level_from_verbose(args.verbose_count)
+
+verbose = logging.INFO
+if verbose:
+    verbose = logging.DEBUG
+
 handbreak_command = args.handbreak_command
 handbreak_timeout = float(args.handbreak_timeout) * 60 * 60
 file_extension = args.file_extension

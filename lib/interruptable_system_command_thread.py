@@ -4,7 +4,6 @@ import select
 import signal
 import subprocess
 import threading
-import shlex
 
 
 class InterruptableSystemCommandThread(threading.Thread):
@@ -22,7 +21,9 @@ class InterruptableSystemCommandThread(threading.Thread):
         self.interrupted = False
         self.exit_code = None
 
-        self.call_process = subprocess.Popen(shlex.split(command), stdout=subprocess.PIPE,
+        self.logger.debug(kwargs)
+        self.logger.debug(command)
+        self.call_process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE,
                                              stderr=subprocess.PIPE, stdin=subprocess.PIPE, preexec_fn=os.setpgrp, **kwargs)
         self.log_levels = {self.call_process.stdout: stdout_log_level, self.call_process.stderr: stderr_log_level}
         threading.Thread.__init__(self)

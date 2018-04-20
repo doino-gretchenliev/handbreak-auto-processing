@@ -63,14 +63,14 @@ class MediaProcessingThread(Thread):
         transcoded_file = os.path.join(file_directory, "{}_transcoded.{}".format(file_name, self.output_file_extension))
         log_file = os.path.join(file_directory, "{}_transcoding.log".format(file_name))
 
-        command = "{handbreak_command} -input {input_file} -output {output_file}" \
-            .format(handbreak_command=self.handbreak_command,
-                    input_file=file,
-                    output_file=transcoded_file
-                    )
-        logger.debug(command)
+        current_env = os.environ.copy()
+        current_env["INPUT_FILE"] = file
+        current_env["OUTPUT_FILE"] = transcoded_file
 
-        self.system_call_thread = InterruptableSystemCommandThread(log_file, command)
+        logger.debug("Handbreak input file: {}".format(file))
+        logger.debug("Handbreak output file: {}".format(transcoded_file))
+
+        self.system_call_thread = InterruptableSystemCommandThread(log_file, self.handbreak_command, env=current_env)
 
         timer = Timer(self.handbreak_timeout, self.system_call_thread.kill)
         timer.start()
