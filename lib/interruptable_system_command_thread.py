@@ -4,9 +4,7 @@ import select
 import signal
 import subprocess
 from threading import Thread
-from threading import Timer
-import errno
-import time
+
 
 class InterruptableSystemCommandThread(Thread):
 

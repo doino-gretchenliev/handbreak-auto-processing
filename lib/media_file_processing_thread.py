@@ -1,6 +1,5 @@
 import logging
 import os
-import sys
 from threading import Thread
 from threading import Timer
 
@@ -98,7 +97,8 @@ class MediaProcessingThread(Thread):
                 raise Exception(
                     "Handbreak processes failed. Please, check the transcoding log file [{}]".format(log_file))
             else:
-                self.logger.debug("Handbreak process finished successfully, removing the transcoding log file [{}]".format(log_file))
+                self.logger.debug(
+                    "Handbreak process finished successfully, removing the transcoding log file [{}]".format(log_file))
                 os.remove(log_file)
                 if self.delete_orig_file:
                     self.logger.debug("Removing the source file [{}]".format(file))
@@ -108,14 +108,16 @@ class MediaProcessingThread(Thread):
 
     def __get_media_file(self):
         try:
-            self.current_processing_file_path = self.processing_dictionary.get_by_value_and_update(MediaFileStates.WAITING,
-                                                                                             MediaFileStates.PROCESSING,
-                                                                                             True)
+            self.current_processing_file_path = self.processing_dictionary.get_by_value_and_update(
+                MediaFileStates.WAITING,
+                MediaFileStates.PROCESSING,
+                True)
         except Exception:
             self.logger.exception("Can't obtain media file to process")
 
     def __return_current_processing_file_path(self, media_file_state):
         if self.current_processing_file_path is not None:
             self.processing_dictionary[self.current_processing_file_path] = media_file_state
-            self.logger.info("File [{}] returned to processing queue, status [{}]".format(self.current_processing_file_path,
-                                                                                     media_file_state.value))
+            self.logger.info(
+                "File [{}] returned to processing queue, status [{}]".format(self.current_processing_file_path,
+                                                                             media_file_state.value))

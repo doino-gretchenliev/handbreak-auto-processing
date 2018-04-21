@@ -1,6 +1,5 @@
 #!/usr/bin/env python2
 import argparse
-import logging
 import logging.handlers
 import os
 import signal
@@ -8,15 +7,13 @@ import sys
 import tempfile
 import threading
 import time
-import shlex
-
 from os.path import expanduser
+
 from watchdog.events import EVENT_TYPE_CREATED
 from watchdog.events import FileSystemEvent
 from watchdog.observers import Observer
 
 from lib.event_handlers import MediaFilesEventHandler
-from lib.exceptions import MediaProcessingNonRecoverableError
 from lib.media_file_processing_thread import MediaProcessingThread
 from lib.media_file_states import MediaFileStates
 from lib.persistent_dictionary import PersistentAtomicDictionary
@@ -68,7 +65,7 @@ parser.add_argument('-s', '--case-sensitive', help='Whether pattern matching sho
 
 parser.add_argument("-v", "--verbose", action="store_true", default=False, help="Enable verbose log output")
 parser.add_argument('-m', '--max-log-size', help='Max log size in MB; set to 0 to disable log file rotating\n'
-                                                 '(default: 100)', default=0)
+                                                 '(default: 100)', default=100)
 parser.add_argument('-k', '--max-log-file-to-keep', help='Max number of log files to keep\n'
                                                          '(default: 5)', default=5)
 
@@ -118,7 +115,6 @@ syslog_handler.setFormatter(formatter)
 file_handler.setFormatter(formatter)
 logger.addHandler(syslog_handler)
 logger.addHandler(file_handler)
-
 
 media_processing_thread_logger = logging.getLogger(MediaProcessingThread.__module__)
 media_processing_thread_logger.handlers = logger.handlers
@@ -183,7 +179,6 @@ if __name__ == "__main__":
 
     signal.signal(signal.SIGINT, clean_handler)
     signal.signal(signal.SIGTERM, clean_handler)
-
 
     logger.info("Handbreak media processor started pid: [{}]".format(os.getpid()))
     logger.info("Watching directories: {}".format(watch_directories))
