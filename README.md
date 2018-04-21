@@ -33,8 +33,8 @@ handbreak-auto-processing.py \
 ```bash
 handbreak-auto-processing.py \
 -w ~/Movies \
--c 'HandBrakeCLI --preset x265-10bit --input $INPUT_FILE --output $OUTPUT_FILE' &&
-filebot -rename $OUTPUT_FILE --db anidb -non-strict
+-c 'HandBrakeCLI --preset x265-10bit --input $INPUT_FILE --output $OUTPUT_FILE &&
+filebot -rename $OUTPUT_FILE --db anidb -non-strict'
 ```
 
 #### Log files
