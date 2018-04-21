@@ -3,32 +3,39 @@ import os
 import select
 import signal
 import subprocess
-import threading
+from threading import Thread
+from threading import Timer
+import errno
+import time
 
+class InterruptableSystemCommandThread(Thread):
 
-class InterruptableSystemCommandThread(threading.Thread):
-
-    def __init__(self, log_file_location, command, stdout_log_level=logging.INFO,
+    def __init__(self, command, env, stdout_log_level=logging.INFO,
                  stderr_log_level=logging.ERROR, **kwargs):
-        self.logger = logging.getLogger(log_file_location)
+        Thread.__init__(self, **kwargs)
 
-        formatter = logging.Formatter('[%(asctime)-15s] [%(levelname)s]: %(message)s')
-        file_handler = logging.FileHandler(filename=log_file_location, encoding='utf-8')
-        file_handler.setFormatter(formatter)
-        self.logger.addHandler(file_handler)
-        self.logger.setLevel(logging.INFO)
+        self.logger = logging.getLogger(__name__)
 
         self.interrupted = False
         self.exit_code = None
 
-        self.logger.debug(kwargs)
+        if env:
+            self.logger.debug('\n'.join(['{}={}'.format(k, v) for k, v in env.iteritems()]))
+        self.env = env
+
         self.logger.debug(command)
-        self.call_process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE,
-                                             stderr=subprocess.PIPE, stdin=subprocess.PIPE, preexec_fn=os.setpgrp, **kwargs)
-        self.log_levels = {self.call_process.stdout: stdout_log_level, self.call_process.stderr: stderr_log_level}
-        threading.Thread.__init__(self)
+        self.command = command
+        self.stdout_log_level = stdout_log_level
+        self.stderr_log_level = stderr_log_level
+        self.call_process = None
+        self.log_levels = {}
 
     def run(self):
+        self.call_process = subprocess.Popen(self.command, env=self.env, shell=True, stdout=subprocess.PIPE,
+                                             stderr=subprocess.PIPE, stdin=subprocess.PIPE, preexec_fn=os.setpgrp)
+        self.log_levels = {self.call_process.stdout: self.stdout_log_level,
+                           self.call_process.stderr: self.stderr_log_level}
+
         while self.call_process.poll() is None:
             self.__check_io()
 
@@ -36,14 +43,15 @@ class InterruptableSystemCommandThread(threading.Thread):
         self.exit_code = self.call_process.wait()
 
     def kill(self, soft_kill=True):
-        if soft_kill:
-            self.call_process.send_signal(signal.SIGINT)
-        else:
-            self.call_process.send_signal(signal.SIGTERM)
-        self.interrupted = True
+        if not self.call_process.poll():
+            if soft_kill:
+                os.killpg(os.getpgid(self.call_process.pid), signal.SIGINT)
+            else:
+                os.killpg(os.getpgid(self.call_process.pid), signal.SIGTERM)
+            self.interrupted = True
 
     def __check_io(self):
-        ready_to_read = select.select([self.call_process.stdout, self.call_process.stderr], [], [], 1000)[0]
+        ready_to_read = select.select([self.call_process.stdout, self.call_process.stderr], [], [], 1)[0]
         for io in ready_to_read:
             line = io.readline()
             self.logger.log(self.log_levels[io], line[:-1])

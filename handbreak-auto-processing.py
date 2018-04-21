@@ -66,8 +66,7 @@ parser.add_argument('-s', '--case-sensitive', help='Whether pattern matching sho
                                                    '(default: depends on the filesystem)',
                     default=is_filesystem_case_sensitive(), action='store_true')
 
-parser.add_argument("-v", "--verbose", action="store_true", default=False,
-                    help="Enable verbose log output")
+parser.add_argument("-v", "--verbose", action="store_true", default=False, help="Enable verbose log output")
 parser.add_argument('-m', '--max-log-size', help='Max log size in MB; set to 0 to disable log file rotating\n'
                                                  '(default: 100)', default=0)
 parser.add_argument('-k', '--max-log-file-to-keep', help='Max number of log files to keep\n'
@@ -91,9 +90,9 @@ case_sensitive = args.case_sensitive
 max_log_size = args.max_log_size
 max_log_file_to_keep = args.max_log_file_to_keep
 
-verbose = logging.INFO
-if verbose:
-    verbose = logging.DEBUG
+logging_level = logging.INFO
+if args.verbose:
+    logging_level = logging.DEBUG
 
 handbreak_command = args.handbreak_command
 handbreak_timeout = float(args.handbreak_timeout) * 60 * 60
@@ -109,7 +108,7 @@ reprocess = args.reprocess
 formatter = logging.Formatter('[%(asctime)-15s] [%(threadName)s] [%(levelname)s]: %(message)s')
 
 logger = logging.getLogger(__name__)
-logger.setLevel(verbose)
+logger.setLevel(logging_level)
 syslog_handler = logging.StreamHandler(sys.stdout)
 file_handler = logging.handlers.RotatingFileHandler(filename='handbreak-auto-processing.log',
                                                     maxBytes=max_log_size,
@@ -120,7 +119,11 @@ file_handler.setFormatter(formatter)
 logger.addHandler(syslog_handler)
 logger.addHandler(file_handler)
 
-lock = threading.Lock()
+
+media_processing_thread_logger = logging.getLogger(MediaProcessingThread.__module__)
+media_processing_thread_logger.handlers = logger.handlers
+media_processing_thread_logger.level = logger.level
+
 current_processing_file_path = None
 
 queue_store_directory = os.path.join(queue_directory, '.handbreak-auto-processing')
@@ -128,7 +131,7 @@ queue_store_directory = os.path.join(queue_directory, '.handbreak-auto-processin
 processing_dict = PersistentAtomicDictionary(queue_store_directory)
 
 system_call_thread = None
-observers = []
+exiting = False
 
 
 def list_media_files():
@@ -138,13 +141,9 @@ def list_media_files():
 
 
 def clean_handler(signal, frame):
-    global observers
-    global system_call_thread
+    logger.info("Processes interrupted by the user exiting [{}], please wait while cleaning up...".format(signal))
 
-    logger.info("Processes interrupted by the user exiting...")
-    for observer in observers:
-        observer.stop()
-        observer.join()
+    exiting = True
     if system_call_thread:
         system_call_thread.join()
     exit(0)
@@ -204,17 +203,20 @@ if __name__ == "__main__":
     for watch_directory in watch_directories:
         observer = Observer()
         observer.schedule(event_handler, watch_directory, recursive=True)
-        observers.append(observer)
+        observer.setDaemon(True)
         observer.start()
 
-    global system_call_thread
-    while True:
-        system_call_thread = MediaProcessingThread(processing_dict,
-                                                   handbreak_command,
-                                                   handbreak_timeout,
-                                                   file_extension,
-                                                   delete)
-        system_call_thread.start()
-        while system_call_thread.isAlive():
-            pass
+    lock = threading.Lock()
+    while not exiting:
+        with lock:
+            system_call_thread = MediaProcessingThread(processing_dict,
+                                                       handbreak_command,
+                                                       handbreak_timeout,
+                                                       file_extension,
+                                                       delete,
+                                                       name=MediaProcessingThread.__module__)
+            system_call_thread.start()
+            while system_call_thread.isAlive():
+                pass
+            system_call_thread = None
         time.sleep(SCAN_FOR_NEW_MEDIA_FILES_FOR_PROCESSING_TIMEOUT)
