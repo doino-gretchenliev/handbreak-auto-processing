@@ -66,4 +66,5 @@ processing log file: `~/Movies/movie-name_transcoding.log`
 | ['-t', '--handbreak-timeout'] | False | N/A | 15 | Timeout of Handbreak command(hours) | 
 | ['-f', '--file-extension'] | False | N/A | mp4 | Output file extension | 
 | ['-d', '--delete'] | False | N/A | False | Delete original file |   
+| ['-z', '--silent-period'] | False | N/A | None | A silent period(the media processing command will be suspended) defined as so: [18:45:20:45]. You can provide multiple periods |
 		

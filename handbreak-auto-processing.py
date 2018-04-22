@@ -5,17 +5,14 @@ import os
 import signal
 import sys
 import tempfile
-import threading
-import time
 from os.path import expanduser
 
-from watchdog.events import EVENT_TYPE_CREATED
-from watchdog.events import FileSystemEvent
 from watchdog.observers import Observer
 
+from lib.rest_api import RestApi
 from lib.event_handlers import MediaFilesEventHandler
-from lib.media_file_processing_thread import MediaProcessingThread
 from lib.media_file_states import MediaFileStates
+from lib.media_processing import MediaProcessing
 from lib.persistent_dictionary import PersistentAtomicDictionary
 
 DEFAULT_INCLUDE_PATTERN = ['*.mp4', '*.mpg', '*.mov', '*.mkv', '*.avi']
@@ -63,6 +60,12 @@ parser.add_argument('-s', '--case-sensitive', help='Whether pattern matching sho
                                                    '(default: depends on the filesystem)',
                     default=is_filesystem_case_sensitive(), action='store_true')
 
+parser.add_argument('-z', '--silent-period',
+                    help='A silent period(the media processing command will be suspended) defined as so: [18:45:20:45]. '
+                         'You can provide multiple periods', action='append')
+parser.add_argument("-x", "--web-interface", action="store_true", default=False,
+                    help="Enable REST API on port 6767. NOTE: limited functionality")
+
 parser.add_argument("-v", "--verbose", action="store_true", default=False, help="Enable verbose log output")
 parser.add_argument('-m', '--max-log-size', help='Max log size in MB; set to 0 to disable log file rotating\n'
                                                  '(default: 100)', default=100)
@@ -100,6 +103,8 @@ retry_media_file = args.retry_media_file
 retry_all_media_files = args.retry_all_media_files
 initial_processing = args.initial_processing
 reprocess = args.reprocess
+silent_period = args.silent_period
+web_interface = args.web_interface
 
 # Logging setup
 formatter = logging.Formatter('[%(asctime)-15s] [%(threadName)s] [%(levelname)s]: %(message)s')
@@ -116,66 +121,51 @@ file_handler.setFormatter(formatter)
 logger.addHandler(syslog_handler)
 logger.addHandler(file_handler)
 
-media_processing_thread_logger = logging.getLogger(MediaProcessingThread.__module__)
+media_processing_thread_logger = logging.getLogger(MediaProcessing.__module__)
 media_processing_thread_logger.handlers = logger.handlers
 media_processing_thread_logger.level = logger.level
 
-current_processing_file_path = None
-
 queue_store_directory = os.path.join(queue_directory, '.handbreak-auto-processing')
-
 processing_dict = PersistentAtomicDictionary(queue_store_directory)
-
-system_call_thread = None
-exiting = False
-
-
-def list_media_files():
-    logger.info("Current processing queue:")
-    for media_file_path in processing_dict.iterkeys():
-        logger.info("[{} : {}]".format(media_file_path, processing_dict[media_file_path].value))
 
 
 def clean_handler(signal, frame):
     logger.info("Processes interrupted by the user exiting [{}], please wait while cleaning up...".format(signal))
-
-    exiting = True
-    if system_call_thread:
-        system_call_thread.join()
+    if rest_api:
+        rest_api.stop()
+    if media_processing:
+        media_processing.stop()
     exit(0)
 
 
-def retry_media_files():
-    if retry_all_media_files:
-        logger.info("Retrying all media files")
-        processing_dict.get_by_value_and_update(MediaFileStates.FAILED, MediaFileStates.WAITING, False)
-    else:
-        processing_dict[retry_media_file] = MediaFileStates.WAITING
-    list_media_files()
-
-
-def initial_processing(event_handler):
-    for watch_directory in watch_directories:
-        for root, dir_names, file_names in os.walk(watch_directory):
-            for filename in file_names:
-                file_path = os.path.join(root, filename).decode('utf-8')
-                if file_path not in processing_dict or (
-                        file_path in processing_dict
-                        and processing_dict[file_path] != MediaFileStates.FAILED):
-                    file_event = FileSystemEvent(file_path)
-                    file_event.is_directory = False
-                    file_event.event_type = EVENT_TYPE_CREATED
-                    event_handler.on_any_event(file_event)
-
-
 if __name__ == "__main__":
+    media_processing = MediaProcessing(
+        processing_dict,
+        handbreak_command,
+        handbreak_timeout,
+        file_extension,
+        delete,
+        silent_period
+    )
+
+    if web_interface:
+        rest_api = RestApi(media_processing)
+
     if list_processing_queue:
-        if len(processing_dict) > 0:
-            list_media_files()
+        if media_processing.get_queue_size() > 0:
+            logger.info("Current processing queue:")
+            media_files = media_processing.get_queue_files()
+            for media_file, status in media_files.items():
+                logger.info("[{} : {}]".format(media_file, status.value))
+        else:
+            logger.info("Processing queue is empty")
         exit(0)
 
-    if retry_all_media_files or retry_media_file:
-        retry_media_files()
+    if retry_all_media_files:
+        media_processing.retry_media_files()
+
+    if retry_media_file:
+        media_processing.retry_media_files(retry_media_file)
 
     signal.signal(signal.SIGINT, clean_handler)
     signal.signal(signal.SIGTERM, clean_handler)
@@ -185,14 +175,13 @@ if __name__ == "__main__":
     logger.info("Include patterns: {}".format(include_pattern))
     logger.info("Exclude patterns: {}".format(exclude_pattern))
     logger.info("Case sensitive: [{}]".format(case_sensitive))
+    logger.info("Processing queue size: [{}]".format(media_processing.get_queue_size()))
 
-    if len(processing_dict) > 0:
-        list_media_files()
-
+    # watch for media files
     event_handler = MediaFilesEventHandler(processing_dict, include_pattern, exclude_pattern, case_sensitive, reprocess)
 
     if initial_processing:
-        initial_processing(event_handler)
+        media_processing.initial_processing(watch_directories, event_handler)
 
     global observers
     for watch_directory in watch_directories:
@@ -201,17 +190,5 @@ if __name__ == "__main__":
         observer.setDaemon(True)
         observer.start()
 
-    lock = threading.Lock()
-    while not exiting:
-        with lock:
-            system_call_thread = MediaProcessingThread(processing_dict,
-                                                       handbreak_command,
-                                                       handbreak_timeout,
-                                                       file_extension,
-                                                       delete,
-                                                       name=MediaProcessingThread.__module__)
-            system_call_thread.start()
-            while system_call_thread.isAlive():
-                pass
-            system_call_thread = None
-        time.sleep(SCAN_FOR_NEW_MEDIA_FILES_FOR_PROCESSING_TIMEOUT)
+    # start media files processing
+    media_processing.start()

@@ -3,6 +3,7 @@ import os
 import select
 import signal
 import subprocess
+import psutil
 from threading import Thread
 
 
@@ -27,6 +28,7 @@ class InterruptableSystemCommandThread(Thread):
         self.stderr_log_level = stderr_log_level
         self.call_process = None
         self.log_levels = {}
+        self.suspended = False
 
     def run(self):
         self.call_process = subprocess.Popen(self.command, env=self.env, shell=True, stdout=subprocess.PIPE,
@@ -42,14 +44,32 @@ class InterruptableSystemCommandThread(Thread):
 
     def kill(self, soft_kill=True):
         if not self.call_process.poll():
+            if self.suspended:
+                self.resume()
             if soft_kill:
                 os.killpg(os.getpgid(self.call_process.pid), signal.SIGINT)
             else:
                 os.killpg(os.getpgid(self.call_process.pid), signal.SIGTERM)
             self.interrupted = True
 
+    def suspend(self):
+        if not self.suspended:
+            os.killpg(os.getpgid(self.call_process.pid), signal.SIGSTOP)
+            self.suspended = True
+        else:
+            raise Exception("process is already suspended")
+
+    def resume(self):
+        if self.suspended:
+            os.killpg(os.getpgid(self.call_process.pid), signal.SIGCONT)
+            self.suspended = False
+        else:
+            raise Exception("process is already running")
+
     def __check_io(self):
         ready_to_read = select.select([self.call_process.stdout, self.call_process.stderr], [], [], 1)[0]
         for io in ready_to_read:
             line = io.readline()
             self.logger.log(self.log_levels[io], line[:-1])
+
+

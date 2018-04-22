@@ -1,3 +1,8 @@
 watchdog==0.8.3
 aenum==2.1.0
 persist-queue==0.3.5
+psutil=5.4.5
+python-dateutil==2.7.2
+schedule==0.5.0
+Flask==0.12.2
+flask_restplus==0.10.1

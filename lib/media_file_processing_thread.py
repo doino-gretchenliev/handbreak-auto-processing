@@ -38,6 +38,20 @@ class MediaProcessingThread(Thread):
             self.system_call_thread.join()
         super(MediaProcessingThread, self).join(timeout)
 
+    def suspend_media_processing(self):
+        try:
+            self.system_call_thread.suspend()
+            self.logger.info("Media processing is suspended")
+        except Exception:
+            self.logger.warn("Media processing is already suspended")
+
+    def resume_media_processing(self):
+        try:
+            self.system_call_thread.resume()
+            self.logger.info("Media processing is resumed")
+        except Exception:
+            self.logger.warn("Media processing is already running")
+
     def __process_media_file(self):
         self.__get_media_file()
 
