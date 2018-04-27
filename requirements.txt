@@ -6,3 +6,4 @@ python-dateutil==2.7.2
 schedule==0.5.0
 Flask==0.12.2
 flask_restplus==0.10.1
+rsa==3.4.2

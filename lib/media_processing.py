@@ -43,6 +43,11 @@ class MediaProcessing(object):
             result[media_file_path] = self.processing_dict[media_file_path]
         return result
 
+    def delete_media_file(self, media_file):
+        return self.processing_dict.check_and_delete(media_file, [MediaFileStates.PROCESSED,
+                                                                  MediaFileStates.WAITING,
+                                                                  MediaFileStates.FAILED])
+
     def retry_media_files(self, media_file=None):
         if not media_file:
             self.logger.info("Retrying all media files")
@@ -99,6 +104,3 @@ class MediaProcessing(object):
 
     def resume_media_processing(self):
         self.system_call_thread.resume_media_processing()
-
-    def get_current_processing_file(self):
-        return self.system_call_thread.current_processing_file_path

@@ -38,6 +38,18 @@ class PersistentAtomicDictionary(sqlbase.SQLiteBase, dict):
                     self._insert_into(tran, key, obj)
                 return exists
 
+    def check_and_delete(self, key, values):
+        with self.tran_lock:
+            with self._putter as tran:
+                result = False
+                exists = self._contains(tran, key)
+                if exists:
+                    for value in values:
+                        if self._get_value(tran, key) == value:
+                            self._delete(key)
+                            result = True
+                return result
+
     def get_by_value_and_update(self, search_value, new_value, first_match=False):
         with self.tran_lock:
             with self._putter as tran:

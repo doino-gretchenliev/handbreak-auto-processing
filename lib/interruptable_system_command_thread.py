@@ -3,7 +3,6 @@ import os
 import select
 import signal
 import subprocess
-import psutil
 from threading import Thread
 
 
