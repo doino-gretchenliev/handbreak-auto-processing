@@ -4,7 +4,6 @@ from flask_restplus import Api, Resource
 from lib.JSONEncoder import JSONEncoder
 from lib.flask_thread import FlaskAppWrapper
 from lib.media_file_state import MediaFileState
-from lib.utils import pretty_time_delta
 
 app = Flask("ok")
 app.json_encoder = JSONEncoder
@@ -31,9 +30,8 @@ class MediaProcessing(Resource):
 
     @ns.doc('get information about current media processing operation')
     def get(self):
-        print mp.system_call_thread.current_processing_file.dict()
         if mp.system_call_thread:
-            response = jsonify(mp.system_call_thread.current_processing_file.dict())
+            response = jsonify(mp.system_call_thread.current_processing_file.dict)
             response.status_code = 200
         else:
             response = jsonify('No processing operation found at the moment')

@@ -8,7 +8,7 @@ import schedule
 from watchdog.events import EVENT_TYPE_CREATED
 from watchdog.events import FileSystemEvent
 
-from lib.media_file_processing_thread import MediaProcessingThread
+from lib.media_file_processing import MediaProcessingThread
 from lib.media_file_state import MediaFileState
 
 

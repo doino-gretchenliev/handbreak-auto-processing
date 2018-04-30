@@ -5,7 +5,7 @@ from threading import Thread
 from threading import Timer
 
 from lib.exceptions import HandbreakProcessInterrupted
-from lib.interruptable_system_command_thread import InterruptableSystemCommandThread
+from lib.interruptable_system_command import InterruptableSystemCommandThread
 from lib.media_file_state import MediaFileState
 
 
