@@ -6,13 +6,13 @@ from threading import Timer
 
 from lib.exceptions import HandbreakProcessInterrupted
 from lib.interruptable_system_command_thread import InterruptableSystemCommandThread
-from lib.media_file_states import MediaFileStates
+from lib.media_file_state import MediaFileState
 
 
 class MediaProcessingThread(Thread):
 
     def __init__(self,
-                 processing_dictionary,
+                 mfq,
                  handbreak_command,
                  handbreak_timeout,
                  output_file_extension,
@@ -25,7 +25,7 @@ class MediaProcessingThread(Thread):
         self.start_execution_time = None
         self.system_call_thread = None
         self.current_processing_file_path = None
-        self.processing_dictionary = processing_dictionary
+        self.mfq = mfq
         self.handbreak_command = handbreak_command
         self.handbreak_timeout = handbreak_timeout
         self.output_file_extension = output_file_extension
@@ -70,15 +70,15 @@ class MediaProcessingThread(Thread):
                 self.logger.info("Processing file [{}]".format(self.current_processing_file_path))
                 self.__execute_handbreak_command(self.current_processing_file_path)
                 self.logger.info("File [{}] processed successfully".format(self.current_processing_file_path))
-                self.processing_dictionary[self.current_processing_file_path] = MediaFileStates.PROCESSED
+                self.mfq[self.current_processing_file_path] = MediaFileState.PROCESSED
                 self.current_processing_file_path = None
             except HandbreakProcessInterrupted:
-                self.__return_current_processing_file_path(MediaFileStates.WAITING)
+                self.__return_current_processing_file_path(MediaFileState.WAITING)
             except Exception:
                 self.logger.exception(
                     "File [{}] returning to processing queue after processing error, status [{}]".format(
-                        self.current_processing_file_path, MediaFileStates.FAILED.value))
-                self.__return_current_processing_file_path(MediaFileStates.FAILED)
+                        self.current_processing_file_path, MediaFileState.FAILED.value))
+                self.__return_current_processing_file_path(MediaFileState.FAILED)
 
     def __execute_handbreak_command(self, file):
         file_directory = os.path.dirname(file)
@@ -132,16 +132,16 @@ class MediaProcessingThread(Thread):
 
     def __get_media_file(self):
         try:
-            self.current_processing_file_path = self.processing_dictionary.get_by_value_and_update(
-                MediaFileStates.WAITING,
-                MediaFileStates.PROCESSING,
+            self.current_processing_file_path = self.mfq.get_by_value_and_update(
+                MediaFileState.WAITING,
+                MediaFileState.PROCESSING,
                 True)
         except Exception:
             self.logger.exception("Can't obtain media file to process")
 
     def __return_current_processing_file_path(self, media_file_state):
         if self.current_processing_file_path is not None:
-            self.processing_dictionary[self.current_processing_file_path] = media_file_state
+            self.mfq[self.current_processing_file_path] = media_file_state
             self.logger.info(
                 "File [{}] returned to processing queue, status [{}]".format(self.current_processing_file_path,
                                                                              media_file_state.value))

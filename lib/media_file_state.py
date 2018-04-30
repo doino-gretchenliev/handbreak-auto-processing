@@ -2,7 +2,7 @@ from aenum import Enum
 from peewee import CharField
 
 
-class MediaFileStates(Enum):
+class MediaFileState(Enum):
     PROCESSING = "processing"
     PROCESSED = "processed"
     WAITING = "waiting"
@@ -15,4 +15,4 @@ class MediaFileStateField(CharField):
         return value.value
 
     def python_value(self, value):
-        return MediaFileStates(value)
+        return MediaFileState(value)

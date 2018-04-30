@@ -5,7 +5,7 @@ from pathtools.patterns import match_path
 from watchdog.events import EVENT_TYPE_CREATED
 from watchdog.events import FileSystemEventHandler
 
-from lib.media_file_states import MediaFileStates
+from lib.media_file_state import MediaFileState
 
 logger = logging.getLogger(__name__)
 
@@ -17,13 +17,13 @@ logger.setLevel(logging.INFO)
 
 
 class MediaFilesEventHandler(FileSystemEventHandler):
-    processing_dictionary = None
+    mfq = None
     include_pattern = None
     exclude_pattern = None
     case_sensitive = None
 
-    def __init__(self, processing_dictionary, include_pattern, exclude_pattern, case_sensitive, reprocess):
-        self.processing_dictionary = processing_dictionary
+    def __init__(self, mfq, include_pattern, exclude_pattern, case_sensitive, reprocess):
+        self.mfq = mfq
         self.include_pattern = include_pattern
         self.exclude_pattern = exclude_pattern
         self.case_sensitive = case_sensitive
@@ -38,9 +38,9 @@ class MediaFilesEventHandler(FileSystemEventHandler):
                 and event.event_type == EVENT_TYPE_CREATED:
             try:
                 file_path = event.src_path.decode('utf-8')
-                if not self.processing_dictionary.check_and_add(file_path,
-                                                                MediaFileStates.WAITING,
-                                                                self.reprocess):
+                if not self.mfq.check_and_add(file_path,
+                                              MediaFileState.WAITING,
+                                              self.reprocess):
                     logger.info("File [{}] added to processing queue".format(file_path))
             except Exception:
                 logger.exception("An error occurred during adding of [{}] to processing queue".format(file_path))

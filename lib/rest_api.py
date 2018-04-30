@@ -3,7 +3,7 @@ from flask_restplus import Api, Resource
 
 from lib.JSONEncoder import JSONEncoder
 from lib.flask_thread import FlaskAppWrapper
-from lib.media_file_states import MediaFileStates
+from lib.media_file_state import MediaFileState
 from lib.utils import pretty_time_delta, QueueIDs
 
 app = Flask("ok")
@@ -36,7 +36,7 @@ class MediaProcessing(Resource):
 
             response = jsonify({
                 'file': mp.system_call_thread.current_processing_file_path,
-                'status': MediaFileStates.PROCESSING,
+                'status': MediaFileState.PROCESSING,
                 'elapsed_time': pretty_time_delta(mp.system_call_thread.get_processing_time()),
                 'suspended': mp.system_call_thread.system_call_thread.suspended
             })
@@ -93,22 +93,22 @@ class QueueSize(Resource):
 @ns.route('/queue/retry')
 class QueueSize(Resource):
 
-    @ns.doc('retry all {} media files in processing queue'.format(MediaFileStates.FAILED.value))
+    @ns.doc('retry all {} media files in processing queue'.format(MediaFileState.FAILED.value))
     def put(self):
         mp.retry_media_files()
-        return 'all {} files retried'.format(MediaFileStates.FAILED.value), 200
+        return 'all {} files retried'.format(MediaFileState.FAILED.value), 200
 
 
 @ns.route('/queue/<string:id>')
 class QueueSize(Resource):
 
-    @ns.doc('retry a {} media file in processing queue'.format(MediaFileStates.FAILED.value))
+    @ns.doc('retry a {} media file in processing queue'.format(MediaFileState.FAILED.value))
     def put(self, id):
         decrypted_id = QueueIDs.decrypt(id)
         mp.retry_media_files(media_file=decrypted_id)
         return 'Media file {} retried'.format(id), 200
 
-    @ns.doc('delete a media file(not in {}) from processing queue'.format(MediaFileStates.PROCESSING.value))
+    @ns.doc('delete a media file(not in {}) from processing queue'.format(MediaFileState.PROCESSING.value))
     def delete(self, id):
         decrypted_id = QueueIDs.decrypt(id)
         existed = mp.delete_media_file(media_file=decrypted_id)
@@ -116,6 +116,6 @@ class QueueSize(Resource):
             response = jsonify('Media file {} deleted'.format(id))
             response.status_code = 200
         else:
-            response = jsonify('Media file {} not found or in status: '.format(id, MediaFileStates.PROCESSING))
+            response = jsonify('Media file {} not found or in status: '.format(id, MediaFileState.PROCESSING))
             response.status_code = 404
         return response

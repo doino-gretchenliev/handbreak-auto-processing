@@ -2,14 +2,14 @@ from flask.json import JSONEncoder
 import calendar
 from datetime import datetime
 
-from lib.media_file_states import MediaFileStates
+from lib.media_file_state import MediaFileState
 
 
 class JSONEncoder(JSONEncoder):
 
     def default(self, obj):
         try:
-            if isinstance(obj, MediaFileStates):
+            if isinstance(obj, MediaFileState):
                 return obj.value
             iterable = iter(obj)
         except TypeError:

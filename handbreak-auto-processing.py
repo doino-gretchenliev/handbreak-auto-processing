@@ -11,7 +11,7 @@ from watchdog.observers import Observer
 
 from lib.rest_api import RestApi
 from lib.event_handlers import MediaFilesEventHandler
-from lib.media_file_states import MediaFileStates
+from lib.media_file_state import MediaFileState
 from lib.media_processing import MediaProcessing
 from lib.persistent_dictionary import PersistentAtomicDictionary
 
@@ -34,11 +34,11 @@ list_command_group = parser.add_mutually_exclusive_group(required=True)
 list_arg = list_watch_group.add_argument('-l', '--list-processing-queue', help='Lists processing queue and exits',
                                          action='store_true')
 parser.add_argument('-n', '--retry-media-file',
-                    help="Change media file state from [{}] to [{}]".format(MediaFileStates.FAILED.value,
-                                                                            MediaFileStates.WAITING.value))
+                    help="Change media file state from [{}] to [{}]".format(MediaFileState.FAILED.value,
+                                                                            MediaFileState.WAITING.value))
 parser.add_argument('-a', '--retry-all-media-files',
-                    help="Change all media file states from [{}] to [{}]".format(MediaFileStates.FAILED.value,
-                                                                                 MediaFileStates.WAITING.value),
+                    help="Change all media file states from [{}] to [{}]".format(MediaFileState.FAILED.value,
+                                                                                 MediaFileState.WAITING.value),
                     action='store_true')
 
 parser.add_argument('-p', '--initial-processing',
@@ -46,7 +46,7 @@ parser.add_argument('-p', '--initial-processing',
                     action='store_true')
 parser.add_argument('-r', '--reprocess',
                     help="Whether to reprocess files already in processing queue with state [{}]".format(
-                        MediaFileStates.PROCESSED.value), action='store_true')
+                        MediaFileState.PROCESSED.value), action='store_true')
 
 list_watch_group.add_argument('-w', '--watch-directory', help='Directory to watch for new media files',
                               action='append')

@@ -2,11 +2,10 @@ import datetime
 import logging
 import os
 
-from playhouse.apsw_ext import SqliteDatabase
-
+from peewee import SqliteDatabase
 from lib.media_file import MediaFile
 from lib.media_file import proxy
-from lib.media_file_states import MediaFileStates
+from lib.media_file_state import MediaFileState
 
 logger = logging.getLogger(__name__)
 
@@ -42,17 +41,18 @@ class MediaFilesQueue(object):
         if isinstance(key, tuple):
             now = datetime.datetime.now()
             if self.__contains__(key):
-                update_fields = { 'status' :status, 'last_modified': now }
+                update_fields = {'status': status, 'last_modified': now}
 
-                if status == MediaFileStates.PROCESSING:
+                if status == MediaFileState.PROCESSING:
                     update_fields['date_started'] = now
-                elif status == MediaFileStates.FAILED or status == MediaFileStates.PROCESSED:
+                elif status == MediaFileState.FAILED or status == MediaFileState.PROCESSED:
                     update_fields['date_finished'] = now
-                elif status == MediaFileStates.WAITING:
+                elif status == MediaFileState.WAITING:
                     update_fields['date_started'] = None
                     update_fields['date_finished'] = None
 
-                MediaFile.update(update_fields).where((MediaFile.id == key[0]) & (MediaFile.file_path == key[1])).execute()
+                MediaFile.update(update_fields).where(
+                    (MediaFile.id == key[0]) & (MediaFile.file_path == key[1])).execute()
             else:
                 MediaFile.create(id=key[0], file_path=key[1], status=status, date_added=now, last_modified=now)
         else:
