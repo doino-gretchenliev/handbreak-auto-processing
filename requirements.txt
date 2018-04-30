@@ -1,9 +1,13 @@
 watchdog==0.8.3
 aenum==2.1.0
 persist-queue==0.3.5
-psutil=5.4.5
+psutil==5.4.5
 python-dateutil==2.7.2
 schedule==0.5.0
 Flask==0.12.2
 flask_restplus==0.10.1
 rsa==3.4.2
+git+https://github.com/rogerbinns/apsw.git@3.22.0-r1#egg=apsw \
+--global-option=fetch --global-option=--version --global-option=3.22.0 --global-option=--all \
+--global-option=build --global-option=--enable-all-extensions
+peewee
