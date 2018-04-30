@@ -1,5 +1,5 @@
 import logging
-import sys
+from uuid import uuid4
 
 from pathtools.patterns import match_path
 from watchdog.events import EVENT_TYPE_CREATED
@@ -8,12 +8,6 @@ from watchdog.events import FileSystemEventHandler
 from lib.media_file_state import MediaFileState
 
 logger = logging.getLogger(__name__)
-
-formatter = logging.Formatter('[%(asctime)-15s] [%(threadName)s] [%(levelname)s]: %(message)s')
-syslog_handler = logging.StreamHandler(sys.stdout)
-syslog_handler.setFormatter(formatter)
-logger.addHandler(syslog_handler)
-logger.setLevel(logging.INFO)
 
 
 class MediaFilesEventHandler(FileSystemEventHandler):
@@ -38,9 +32,12 @@ class MediaFilesEventHandler(FileSystemEventHandler):
                 and event.event_type == EVENT_TYPE_CREATED:
             try:
                 file_path = event.src_path.decode('utf-8')
-                if not self.mfq.check_and_add(file_path,
-                                              MediaFileState.WAITING,
-                                              self.reprocess):
-                    logger.info("File [{}] added to processing queue".format(file_path))
+                with self.mfq.database.atomic('EXCLUSIVE'):
+                    if file_path not in self.mfq or self.reprocess:
+                        id = uuid4()
+                        self.mfq[id, file_path] = MediaFileState.WAITING
+                        media_file = self.mfq[id, file_path]
+                        logger.info("File [{}] added to processing queue".format(media_file.identifier))
+                        logger.debug(media_file)
             except Exception:
                 logger.exception("An error occurred during adding of [{}] to processing queue".format(file_path))

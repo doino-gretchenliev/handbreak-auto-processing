@@ -9,11 +9,11 @@ from os.path import expanduser
 
 from watchdog.observers import Observer
 
-from lib.rest_api import RestApi
 from lib.event_handlers import MediaFilesEventHandler
 from lib.media_file_state import MediaFileState
 from lib.media_processing import MediaProcessing
-from lib.persistent_dictionary import PersistentAtomicDictionary
+from lib.persistent_media_files_queue import MediaFilesQueue
+from lib.rest_api import RestApi
 
 DEFAULT_INCLUDE_PATTERN = ['*.mp4', '*.mpg', '*.mov', '*.mkv', '*.avi']
 SCAN_FOR_NEW_MEDIA_FILES_FOR_PROCESSING_TIMEOUT = 10
@@ -66,7 +66,7 @@ parser.add_argument('-z', '--silent-period',
 parser.add_argument("-x", "--web-interface", action="store_true", default=False,
                     help="Enable REST API on port 6767. NOTE: limited functionality")
 
-parser.add_argument("-v", "--verbose", action="store_true", default=False, help="Enable verbose log output")
+parser.add_argument("-v", "--verbose", action='count', help="Enable verbose log output")
 parser.add_argument('-m', '--max-log-size', help='Max log size in MB; set to 0 to disable log file rotating\n'
                                                  '(default: 100)', default=100)
 parser.add_argument('-k', '--max-log-file-to-keep', help='Max number of log files to keep\n'
@@ -91,8 +91,11 @@ max_log_size = args.max_log_size
 max_log_file_to_keep = args.max_log_file_to_keep
 
 logging_level = logging.INFO
-if args.verbose:
+peewee_logging_level = logging_level
+if args.verbose > 0:
     logging_level = logging.DEBUG
+if args.verbose > 1:
+    peewee_logging_level = logging_level
 
 handbreak_command = args.handbreak_command
 handbreak_timeout = float(args.handbreak_timeout) * 60 * 60
@@ -125,12 +128,21 @@ media_processing_thread_logger = logging.getLogger(MediaProcessing.__module__)
 media_processing_thread_logger.handlers = logger.handlers
 media_processing_thread_logger.level = logger.level
 
+media_files_event_handler_logger = logging.getLogger(MediaFilesEventHandler.__module__)
+media_files_event_handler_logger.handlers = logger.handlers
+media_files_event_handler_logger.level = logger.level
+
+peewee_logger = logging.getLogger('peewee')
+peewee_logger.handlers = logger.handlers
+peewee_logger.level = peewee_logging_level
+
 queue_store_directory = os.path.join(queue_directory, '.handbreak-auto-processing')
-processing_dict = PersistentAtomicDictionary(queue_store_directory)
+mfq = MediaFilesQueue(queue_store_directory)
 
 
 def clean_handler(signal, frame):
     logger.info("Processes interrupted by the user exiting [{}], please wait while cleaning up...".format(signal))
+    global rest_api
     if rest_api:
         rest_api.stop()
     if media_processing:
@@ -140,7 +152,7 @@ def clean_handler(signal, frame):
 
 if __name__ == "__main__":
     media_processing = MediaProcessing(
-        processing_dict,
+        mfq,
         handbreak_command,
         handbreak_timeout,
         file_extension,
@@ -149,6 +161,7 @@ if __name__ == "__main__":
     )
 
     if web_interface:
+        global rest_api
         rest_api = RestApi(media_processing)
 
     if list_processing_queue:
@@ -178,7 +191,7 @@ if __name__ == "__main__":
     logger.info("Processing queue size: [{}]".format(media_processing.get_queue_size()))
 
     # watch for media files
-    event_handler = MediaFilesEventHandler(processing_dict, include_pattern, exclude_pattern, case_sensitive, reprocess)
+    event_handler = MediaFilesEventHandler(mfq, include_pattern, exclude_pattern, case_sensitive, reprocess)
 
     if initial_processing:
         media_processing.initial_processing(watch_directories, event_handler)

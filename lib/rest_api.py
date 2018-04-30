@@ -4,7 +4,7 @@ from flask_restplus import Api, Resource
 from lib.JSONEncoder import JSONEncoder
 from lib.flask_thread import FlaskAppWrapper
 from lib.media_file_state import MediaFileState
-from lib.utils import pretty_time_delta, QueueIDs
+from lib.utils import pretty_time_delta
 
 app = Flask("ok")
 app.json_encoder = JSONEncoder
@@ -31,15 +31,9 @@ class MediaProcessing(Resource):
 
     @ns.doc('get information about current media processing operation')
     def get(self):
+        print mp.system_call_thread.current_processing_file.dict()
         if mp.system_call_thread:
-            response = jsonify(mp.get_queue_files())
-
-            response = jsonify({
-                'file': mp.system_call_thread.current_processing_file_path,
-                'status': MediaFileState.PROCESSING,
-                'elapsed_time': pretty_time_delta(mp.system_call_thread.get_processing_time()),
-                'suspended': mp.system_call_thread.system_call_thread.suspended
-            })
+            response = jsonify(mp.system_call_thread.current_processing_file.dict())
             response.status_code = 200
         else:
             response = jsonify('No processing operation found at the moment')
@@ -74,7 +68,7 @@ class Queue(Resource):
     def get(self):
         result = {}
         for file in mp.get_queue_files():
-            result[QueueIDs.encrypt(file[0])] = {'file': file[0], 'status': file[1]}
+            pass
 
         response = jsonify(result)
         response.status_code = 200
@@ -104,14 +98,12 @@ class QueueSize(Resource):
 
     @ns.doc('retry a {} media file in processing queue'.format(MediaFileState.FAILED.value))
     def put(self, id):
-        decrypted_id = QueueIDs.decrypt(id)
-        mp.retry_media_files(media_file=decrypted_id)
+        mp.retry_media_files(media_file=id)
         return 'Media file {} retried'.format(id), 200
 
     @ns.doc('delete a media file(not in {}) from processing queue'.format(MediaFileState.PROCESSING.value))
     def delete(self, id):
-        decrypted_id = QueueIDs.decrypt(id)
-        existed = mp.delete_media_file(media_file=decrypted_id)
+        existed = mp.delete_media_file(media_file=id)
         if existed:
             response = jsonify('Media file {} deleted'.format(id))
             response.status_code = 200

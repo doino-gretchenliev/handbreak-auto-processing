@@ -39,19 +39,23 @@ class MediaProcessing(object):
 
     def get_queue_files(self):
         result = {}
-        for media_file_path in self.mfq.iterkeys():
-            result[media_file_path] = self.mfq[media_file_path]
+        for media_file in self.mfq:
+            result[media_file.id] = media_file
         return result
 
     def delete_media_file(self, media_file):
-        return self.mfq.check_and_delete(media_file, [MediaFileState.PROCESSED,
-                                                      MediaFileState.WAITING,
-                                                      MediaFileState.FAILED])
+        with self.mfq.database.atomic('EXCLUSIVE'):
+            if self.mfq[media_file].status != MediaFileState.PROCESSING:
+                del self.mfq[media_file]
+            else:
+                raise Exception('can\'t delete {} while it\'s processing'.format(media_file))
 
     def retry_media_files(self, media_file=None):
         if not media_file:
             self.logger.info("Retrying all media files")
-            self.mfq.get_by_value_and_update(MediaFileState.FAILED, MediaFileState.WAITING, False)
+            with self.mfq.database.atomic('EXCLUSIVE'):
+                for media_file in self.mfq:
+                    self.mfq[media_file.id] = MediaFileState.WAITING
         else:
             self.logger.info("Retrying [{}] media files".format(media_file))
             self.mfq[media_file] = MediaFileState.WAITING
@@ -82,13 +86,14 @@ class MediaProcessing(object):
             for root, dir_names, file_names in os.walk(watch_directory):
                 for filename in file_names:
                     file_path = os.path.join(root, filename).decode('utf-8')
-                    if file_path not in self.mfq or (
-                            file_path in self.mfq
-                            and self.mfq[file_path] != MediaFileState.FAILED):
-                        file_event = FileSystemEvent(file_path)
-                        file_event.is_directory = False
-                        file_event.event_type = EVENT_TYPE_CREATED
-                        event_handler.on_any_event(file_event)
+                    with self.mfq.database.atomic('EXCLUSIVE'):
+                        if file_path not in self.mfq or (
+                                file_path in self.mfq
+                                and self.mfq[file_path].status != MediaFileState.FAILED):
+                            file_event = FileSystemEvent(file_path)
+                            file_event.is_directory = False
+                            file_event.event_type = EVENT_TYPE_CREATED
+                            event_handler.on_any_event(file_event)
 
     def schedule_silent_periods(self, periods):
         for period in periods:

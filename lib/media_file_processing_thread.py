@@ -24,7 +24,7 @@ class MediaProcessingThread(Thread):
 
         self.start_execution_time = None
         self.system_call_thread = None
-        self.current_processing_file_path = None
+        self.current_processing_file = None
         self.mfq = mfq
         self.handbreak_command = handbreak_command
         self.handbreak_timeout = handbreak_timeout
@@ -65,20 +65,22 @@ class MediaProcessingThread(Thread):
     def __process_media_file(self):
         self.__get_media_file()
 
-        if self.current_processing_file_path is not None:
+        if self.current_processing_file is not None:
             try:
-                self.logger.info("Processing file [{}]".format(self.current_processing_file_path))
-                self.__execute_handbreak_command(self.current_processing_file_path)
-                self.logger.info("File [{}] processed successfully".format(self.current_processing_file_path))
-                self.mfq[self.current_processing_file_path] = MediaFileState.PROCESSED
-                self.current_processing_file_path = None
+                self.logger.info("Processing file [{}]".format(self.current_processing_file.identifier))
+                self.logger.debug(self.current_processing_file)
+                self.__execute_handbreak_command(self.current_processing_file.file_path)
+                self.logger.info("File [{}] processed successfully".format(self.current_processing_file.identifier))
+                self.logger.debug(self.current_processing_file)
+                self.mfq[self.current_processing_file.id, self.current_processing_file.file_path] = MediaFileState.PROCESSED
+                self.current_processing_file = None
             except HandbreakProcessInterrupted:
-                self.__return_current_processing_file_path(MediaFileState.WAITING)
+                self.__return_current_processing_file(MediaFileState.WAITING)
             except Exception:
                 self.logger.exception(
                     "File [{}] returning to processing queue after processing error, status [{}]".format(
-                        self.current_processing_file_path, MediaFileState.FAILED.value))
-                self.__return_current_processing_file_path(MediaFileState.FAILED)
+                        self.current_processing_file.identifier, MediaFileState.FAILED.value))
+                self.__return_current_processing_file(MediaFileState.FAILED)
 
     def __execute_handbreak_command(self, file):
         file_directory = os.path.dirname(file)
@@ -132,16 +134,17 @@ class MediaProcessingThread(Thread):
 
     def __get_media_file(self):
         try:
-            self.current_processing_file_path = self.mfq.get_by_value_and_update(
-                MediaFileState.WAITING,
-                MediaFileState.PROCESSING,
-                True)
+            with self.mfq.database.atomic('EXCLUSIVE'):
+                self.current_processing_file = self.mfq.peek(MediaFileState.WAITING)
+                self.mfq[self.current_processing_file.id, self.current_processing_file.file_path] = MediaFileState.PROCESSING
         except Exception:
-            self.logger.exception("Can't obtain media file to process")
+            self.logger.warn("Can't obtain media file to process")
 
-    def __return_current_processing_file_path(self, media_file_state):
-        if self.current_processing_file_path is not None:
-            self.mfq[self.current_processing_file_path] = media_file_state
+    def __return_current_processing_file(self, media_file_state):
+        if self.current_processing_file is not None:
+            self.mfq[self.current_processing_file.id, self.current_processing_file.file_path] = media_file_state
             self.logger.info(
-                "File [{}] returned to processing queue, status [{}]".format(self.current_processing_file_path,
+                "File [{}] returned to processing queue, status [{}]".format(self.current_processing_file.identifier,
                                                                              media_file_state.value))
+            self.logger.debug(self.current_processing_file)
+

@@ -21,6 +21,8 @@ def transaction(func):
 class MediaFilesQueue(object):
 
     def __init__(self, path):
+        if not os.path.exists(path):
+            os.mkdir(path)
         self.database = SqliteDatabase(os.path.join(path, 'media-files-queue.db'))
         proxy.initialize(self.database)
         proxy.connect()
@@ -71,6 +73,12 @@ class MediaFilesQueue(object):
             result.append(media_file)
         return "MediaFilesQueue({})".format(result)
 
+    def serialize(self):
+        result = []
+        for media_file in MediaFile.select().iterator():
+            result.append(media_file.dict())
+        return result
+
     def __iter__(self):
         return MediaFile.select().iterator()
 
@@ -95,13 +103,17 @@ class MediaFilesQueue(object):
 
     @transaction
     def pop(self, status=None):
+        result = self.peek(status)
+        self.__delitem__(result.id)
+        return result
+
+    def peek(self, status=None):
         if status:
             result = MediaFile.select().where(MediaFile.status == status).first()
         else:
             result = MediaFile.select().first()
         if not result:
             raise Exception('no media file found')
-        self.__delitem__(result.id)
         return result
 
     @transaction
@@ -118,5 +130,8 @@ class MediaFilesQueue(object):
             raise Exception('no media file found')
 
     @transaction
-    def clear(self):
-        return MediaFile.delete().execute()
+    def clear(self, safe=True):
+        if safe:
+            MediaFile.delete().where(MediaFile.status != MediaFileState.PROCESSING).execute()
+        else:
+            MediaFile.delete().execute()
