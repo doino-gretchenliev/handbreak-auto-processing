@@ -40,25 +40,29 @@ class MediaFilesQueue(object):
 
     @transaction
     def __setitem__(self, key, status):
-        if isinstance(key, tuple):
-            now = datetime.datetime.now()
-            if self.__contains__(key):
-                update_fields = {'status': status, 'last_modified': now}
+        now = datetime.datetime.now()
+        if self.__contains__(key):
+            update_fields = {'status': status, 'last_modified': now}
 
-                if status == MediaFileState.PROCESSING:
-                    update_fields['date_started'] = now
-                elif status == MediaFileState.FAILED or status == MediaFileState.PROCESSED:
-                    update_fields['date_finished'] = now
-                elif status == MediaFileState.WAITING:
-                    update_fields['date_started'] = None
-                    update_fields['date_finished'] = None
+            if status == MediaFileState.PROCESSING:
+                update_fields['date_started'] = now
+            elif status == MediaFileState.FAILED or status == MediaFileState.PROCESSED:
+                update_fields['date_finished'] = now
+            elif status == MediaFileState.WAITING:
+                update_fields['date_started'] = None
+                update_fields['date_finished'] = None
 
+            if isinstance(key, tuple):
                 MediaFile.update(update_fields).where(
                     (MediaFile.id == key[0]) & (MediaFile.file_path == key[1])).execute()
             else:
-                MediaFile.create(id=key[0], file_path=key[1], status=status, date_added=now, last_modified=now)
+                MediaFile.update(update_fields).where(MediaFile.id == key).execute()
         else:
-            raise ValueError('you must provide both id and file_path')
+            if isinstance(key, tuple):
+                MediaFile.create(id=key[0], file_path=key[1], status=status, date_added=now, last_modified=now)
+            else:
+                raise Exception('media file doesn\'t exist, you must provide both id and file_path')
+
 
     def __getitem__(self, key):
         if isinstance(key, tuple):
@@ -135,3 +139,7 @@ class MediaFilesQueue(object):
             MediaFile.delete().where(MediaFile.status != MediaFileState.PROCESSING).execute()
         else:
             MediaFile.delete().execute()
+
+    @property
+    def list(self):
+        return [ media_file.dict for media_file in MediaFile ]

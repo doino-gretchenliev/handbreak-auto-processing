@@ -165,7 +165,7 @@ if __name__ == "__main__":
         rest_api = RestApi(media_processing)
 
     if list_processing_queue:
-        if media_processing.get_queue_size() > 0:
+        if len(mfq) > 0:
             logger.info("Current processing queue:")
             media_files = media_processing.get_queue_files()
             for media_file, status in media_files.items():
@@ -188,7 +188,7 @@ if __name__ == "__main__":
     logger.info("Include patterns: {}".format(include_pattern))
     logger.info("Exclude patterns: {}".format(exclude_pattern))
     logger.info("Case sensitive: [{}]".format(case_sensitive))
-    logger.info("Processing queue size: [{}]".format(media_processing.get_queue_size()))
+    logger.info("Processing queue size: [{}]".format(len(mfq)))
 
     # watch for media files
     event_handler = MediaFilesEventHandler(mfq, include_pattern, exclude_pattern, case_sensitive, reprocess)

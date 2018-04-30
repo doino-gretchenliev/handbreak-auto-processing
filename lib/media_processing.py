@@ -34,9 +34,6 @@ class MediaProcessing(object):
         if periods:
             self.schedule_silent_periods(periods)
 
-    def get_queue_size(self):
-        return len(self.mfq)
-
     def get_queue_files(self):
         result = {}
         for media_file in self.mfq:
@@ -45,7 +42,7 @@ class MediaProcessing(object):
 
     def delete_media_file(self, media_file):
         with self.mfq.database.atomic('EXCLUSIVE'):
-            if self.mfq[media_file].status != MediaFileState.PROCESSING:
+            if media_file in self.mfq and self.mfq[media_file].status != MediaFileState.PROCESSING:
                 del self.mfq[media_file]
             else:
                 raise Exception('can\'t delete {} while it\'s processing'.format(media_file))
@@ -55,7 +52,7 @@ class MediaProcessing(object):
             self.logger.info("Retrying all media files")
             with self.mfq.database.atomic('EXCLUSIVE'):
                 for media_file in self.mfq:
-                    self.mfq[media_file.id] = MediaFileState.WAITING
+                    self.mfq[media_file.id, media_file.file_path] = MediaFileState.WAITING
         else:
             self.logger.info("Retrying [{}] media files".format(media_file))
             self.mfq[media_file] = MediaFileState.WAITING
@@ -105,7 +102,13 @@ class MediaProcessing(object):
             schedule.every().day.at(end_time.strftime("%H:%M")).do(self.resume_media_processing)
 
     def suspend_media_processing(self):
-        self.system_call_thread.suspend_media_processing()
+        if self.system_call_thread:
+            self.system_call_thread.suspend_media_processing()
+        else:
+            raise Exception('no running media processing found')
 
     def resume_media_processing(self):
-        self.system_call_thread.resume_media_processing()
+        if self.system_call_thread:
+            self.system_call_thread.resume_media_processing()
+        else:
+            raise Exception('no running media processing found')
