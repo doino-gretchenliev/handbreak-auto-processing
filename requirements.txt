@@ -8,3 +8,4 @@ Flask==0.12.2
 flask_restplus==0.10.1
 rsa==3.4.2
 peewee
+humanize==0.5.1

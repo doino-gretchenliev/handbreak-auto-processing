@@ -1,33 +1,45 @@
 from datetime import datetime, date, time, timedelta
 
 from flask import jsonify
-from flask_restplus import Resource, Namespace
+from flask_restplus import Resource, Namespace, inputs
+from humanize import naturalsize, naturaldelta, intword, intcomma, apnumber
 
 from lib.media_file_state import MediaFileState
 
 mp = None
 api = Namespace('queue', description='Control processing queue')
 
+parser = api.parser()
+parser.add_argument('humanize', type=inputs.boolean, help='return humanize results', default=True, required=False)
+
 
 @api.route('/')
 class Queue(Resource):
 
     @api.doc(description='get information about media processing queue state')
+    @api.expect(parser)
     def get(self):
-        return mp.mfq.list, 200
+        args = parser.parse_args()
+        return mp.mfq.list(args.humanize), 200
 
 
 @api.route('/stats')
 class QueueStats(Resource):
 
     @api.doc(description='get statistic for media processing queue')
+    @api.expect(parser)
     def get(self):
+        args = parser.parse_args()
+
         start_of_the_day = datetime.combine(date.today(), time())
         end_of_the_day = start_of_the_day + timedelta(days=1) - timedelta(microseconds=1)
 
         processing_time = timedelta(microseconds=0)
+        count = 0
         processed_count = 0
         processed_today = 0
+        total_input_file_size = 0
+        total_processed_file_size = 0
         for media_file in mp.mfq:
             if media_file.date_started and media_file.date_finished:
                 processed_count += 1
@@ -35,11 +47,21 @@ class QueueStats(Resource):
 
                 if media_file.date_started >= start_of_the_day and media_file.date_finished <= end_of_the_day:
                     processed_today += 1
+                if media_file.transcoded_file_size:
+                    total_processed_file_size += media_file.transcoded_file_size
+            total_input_file_size += media_file.file_size
+            count += 1
+
+        average_processing_time = QueueStats.mean(processing_time, processed_count)
+        average_processed_per_day = QueueStats.mean(processed_count, (processing_time.total_seconds() / (60 * 60 * 24)))
+        average_processed_file_size = total_processed_file_size / processed_count
+        average_input_file_size = total_input_file_size / count
         return {
-            'processed_today': processed_today,
-            'average_processed_per_day': str(
-                QueueStats.mean(processed_count, (processing_time.total_seconds() / (60 * 60 * 24)))),
-            'average_processing_time': str(QueueStats.mean(processing_time, processed_count))
+            'processed_today': apnumber(processed_today) if args.humanize else processed_today,
+            'average_processed_per_day':  intword(average_processed_per_day) if args.humanize else str(average_processed_per_day),
+            'average_processing_time': naturaldelta(average_processing_time) if args.humanize else str(average_processing_time),
+            'average_processed_file_size': naturalsize(average_processed_file_size) if args.humanize else average_processed_file_size,
+            'average_input_file_size': naturalsize(average_input_file_size) if args.humanize else average_input_file_size
         }
 
     @staticmethod
@@ -93,8 +115,10 @@ class QueueLoad(Resource):
 class QueueSize(Resource):
 
     @api.doc(description='get size of media processing queue')
+    @api.expect(parser)
     def get(self):
-        return len(mp.mfq), 200
+        args = parser.parse_args()
+        return intcomma(len(mp.mfq)) if args.humanize else len(mp.mfq), 200
 
 
 @api.route('/retry')

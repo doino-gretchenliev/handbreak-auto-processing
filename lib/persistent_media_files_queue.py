@@ -20,7 +20,8 @@ def transaction(func):
 
 class MediaFilesQueue(object):
 
-    def __init__(self, path):
+    def __init__(self, path, output_file_extension):
+        self.output_file_extension = output_file_extension
         if not os.path.exists(path):
             os.mkdir(path)
         self.__database = SqliteDatabase(os.path.join(path, 'media-files-queue.db'))
@@ -49,11 +50,19 @@ class MediaFilesQueue(object):
 
             if status == MediaFileState.PROCESSING:
                 update_fields['date_started'] = now
-            elif status == MediaFileState.FAILED or status == MediaFileState.PROCESSED:
+            elif status == MediaFileState.PROCESSED:
+                transcoded_file_path = self.__getitem__(key).transcoded_file_path
+                try:
+                    update_fields['transcoded_file_size'] = os.path.getsize(transcoded_file_path)
+                except OSError:
+                    logger.warn("Unable to obtain transcoded file size [{}]".format(transcoded_file_path))
                 update_fields['date_finished'] = now
+            elif status == MediaFileState.FAILED:
+                    update_fields['date_finished'] = now
             elif status == MediaFileState.WAITING:
-                update_fields['date_started'] = None
-                update_fields['date_finished'] = None
+                update_fields['date_started'] >> None
+                update_fields['date_finished'] >> None
+                update_fields['transcoded_file_size'] >> None
 
             if isinstance(key, tuple):
                 MediaFile.update(update_fields).where(
@@ -62,7 +71,20 @@ class MediaFilesQueue(object):
                 MediaFile.update(update_fields).where(MediaFile.id == key).execute()
         else:
             if isinstance(key, tuple):
-                MediaFile.create(id=key[0], file_path=key[1], status=status, date_added=now, last_modified=now)
+                file_directory = os.path.dirname(key[1])
+                file_name = os.path.splitext(os.path.basename(key[1]))[0]
+                transcoded_file = os.path.join(file_directory,
+                                               "{}_transcoded.{}".format(file_name, self.output_file_extension))
+                log_file = os.path.join(file_directory, "{}_transcoding.log".format(file_name))
+
+                MediaFile.create(id=key[0],
+                                 file_path=key[1],
+                                 transcoded_file_path=transcoded_file,
+                                 log_file_path=log_file,
+                                 status=status,
+                                 file_size=os.path.getsize(key[1]),
+                                 date_added=now,
+                                 last_modified=now)
             else:
                 raise Exception('media file doesn\'t exist, you must provide both id and file_path')
 
@@ -142,6 +164,5 @@ class MediaFilesQueue(object):
         else:
             MediaFile.delete().execute()
 
-    @property
-    def list(self):
-        return [ media_file.dict for media_file in MediaFile ]
+    def list(self, humanize=False):
+        return [ media_file.dict(humanize) for media_file in MediaFile ]

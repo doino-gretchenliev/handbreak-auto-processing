@@ -137,7 +137,7 @@ peewee_logger.handlers = logger.handlers
 peewee_logger.level = peewee_logging_level
 
 queue_store_directory = os.path.join(queue_directory, '.handbreak-auto-processing')
-mfq = MediaFilesQueue(queue_store_directory)
+mfq = MediaFilesQueue(queue_store_directory, file_extension)
 
 
 def clean_handler(signal, frame):
@@ -155,7 +155,6 @@ if __name__ == "__main__":
         mfq,
         handbreak_command,
         handbreak_timeout,
-        file_extension,
         delete,
         silent_period
     )

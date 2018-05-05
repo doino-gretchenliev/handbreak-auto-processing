@@ -63,7 +63,6 @@ class MediaProcessing(object):
                 self.system_call_thread = MediaProcessingThread(self.mfq,
                                                                 self.handbreak_command,
                                                                 self.handbreak_timeout,
-                                                                self.file_extension,
                                                                 self.delete,
                                                                 name=MediaProcessingThread.__module__)
                 self.system_call_thread.start()

@@ -15,7 +15,6 @@ class MediaProcessingThread(Thread):
                  mfq,
                  handbreak_command,
                  handbreak_timeout,
-                 output_file_extension,
                  delete_orig_file,
                  **kwargs):
         Thread.__init__(self, **kwargs)
@@ -28,7 +27,6 @@ class MediaProcessingThread(Thread):
         self.mfq = mfq
         self.handbreak_command = handbreak_command
         self.handbreak_timeout = handbreak_timeout
-        self.output_file_extension = output_file_extension
         self.delete_orig_file = delete_orig_file
 
     def run(self):
@@ -69,7 +67,8 @@ class MediaProcessingThread(Thread):
             try:
                 self.logger.info("Processing file [{}]".format(self.current_processing_file.identifier))
                 self.logger.debug(self.current_processing_file)
-                self.__execute_handbreak_command(self.current_processing_file.file_path)
+                self.__execute_handbreak_command()
+
                 self.logger.info("File [{}] processed successfully".format(self.current_processing_file.identifier))
                 self.logger.debug(self.current_processing_file)
                 self.mfq[self.current_processing_file.id, self.current_processing_file.file_path] = MediaFileState.PROCESSED
@@ -82,25 +81,20 @@ class MediaProcessingThread(Thread):
                         self.current_processing_file.identifier, MediaFileState.FAILED.value))
                 self.__return_current_processing_file(MediaFileState.FAILED)
 
-    def __execute_handbreak_command(self, file):
-        file_directory = os.path.dirname(file)
-        file_name = os.path.splitext(os.path.basename(file))[0]
-        transcoded_file = os.path.join(file_directory, "{}_transcoded.{}".format(file_name, self.output_file_extension))
-        log_file = os.path.join(file_directory, "{}_transcoding.log".format(file_name))
-
+    def __execute_handbreak_command(self):
         handbreak_command_logger = logging.getLogger(InterruptableSystemCommandThread.__module__)
         formatter = logging.Formatter('[%(asctime)-15s] [%(levelname)s]: %(message)s')
-        file_handler = logging.FileHandler(filename=log_file, encoding='utf-8')
+        file_handler = logging.FileHandler(filename=self.current_processing_file.log_file_path, encoding='utf-8')
         file_handler.setFormatter(formatter)
         handbreak_command_logger.handlers = [file_handler]
         handbreak_command_logger.setLevel(self.logger.level)
 
         current_env = os.environ.copy()
-        current_env["INPUT_FILE"] = file
-        current_env["OUTPUT_FILE"] = transcoded_file
+        current_env["INPUT_FILE"] = self.current_processing_file.file_path
+        current_env["OUTPUT_FILE"] = self.current_processing_file.transcoded_file_path
 
-        self.logger.debug("Handbreak input file: {}".format(file))
-        self.logger.debug("Handbreak output file: {}".format(transcoded_file))
+        self.logger.debug("Handbreak input file: {}".format(self.current_processing_file.file_path))
+        self.logger.debug("Handbreak output file: {}".format(self.current_processing_file.transcoded_file_path))
 
         self.system_call_thread = InterruptableSystemCommandThread(self.handbreak_command,
                                                                    env=current_env,
@@ -121,14 +115,16 @@ class MediaProcessingThread(Thread):
                 raise HandbreakProcessInterrupted(message)
             elif self.system_call_thread.exit_code != 0:
                 raise Exception(
-                    "Handbreak processes failed. Please, check the transcoding log file [{}]".format(log_file))
+                    "Handbreak processes failed. Please, check the transcoding log file [{}]"
+                        .format(self.current_processing_file.log_file_path))
             else:
                 self.logger.debug(
-                    "Handbreak process finished successfully, removing the transcoding log file [{}]".format(log_file))
-                os.remove(log_file)
+                    "Handbreak process finished successfully, removing the transcoding log file [{}]"
+                        .format(self.current_processing_file.log_file_path))
+                os.remove(self.current_processing_file.log_file_path)
                 if self.delete_orig_file:
-                    self.logger.debug("Removing the source file [{}]".format(file))
-                    os.remove(file)
+                    self.logger.debug("Removing the source file [{}]".format(self.current_processing_file.file_path))
+                    os.remove(self.current_processing_file.file_path)
         else:
             raise Exception("Handbreak processes killed after {} hours".format(self.handbreak_timeout / 60 / 60))
 
