@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, Blueprint
 from flask_restplus import Api
 
 from lib.JSONEncoder import JSONEncoder
@@ -11,9 +11,12 @@ from lib.namespaces import queue
 app = Flask("ok")
 app.json_encoder = JSONEncoder
 app.config.SWAGGER_UI_JSONEDITOR = True
-api = Api(app, version='0.0.1', title='Handbreak auto processing tool API')
+
+blueprint = Blueprint('api', __name__)
+api = Api(blueprint, version='0.0.1', title='Handbreak auto processing tool API')
 api.add_namespace(local.api)
 api.add_namespace(queue.api)
+app.register_blueprint(blueprint)
 
 
 class RestApi(object):
