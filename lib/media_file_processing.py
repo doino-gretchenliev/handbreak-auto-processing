@@ -134,7 +134,7 @@ class MediaProcessingThread(Thread):
 
     def __get_media_file(self):
         try:
-            with self.mfq.database.atomic('EXCLUSIVE'):
+            with self.mfq.obtain_lock():
                 self.current_processing_file = self.mfq.peek(MediaFileState.WAITING)
                 self.mfq[self.current_processing_file.id, self.current_processing_file.file_path] = MediaFileState.PROCESSING
         except Exception:

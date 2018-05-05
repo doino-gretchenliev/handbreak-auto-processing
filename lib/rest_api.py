@@ -73,6 +73,14 @@ class Queue(Resource):
         return mp.mfq.list, 200
 
 
+@ns.route('/queue/stats')
+class QueueStats(Resource):
+
+    @ns.doc('get statistic for media processing queue')
+    def get(self):
+        return {}
+
+
 @ns.route('/queue/size')
 class QueueSize(Resource):
 

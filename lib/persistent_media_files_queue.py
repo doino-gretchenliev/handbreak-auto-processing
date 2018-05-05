@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def transaction(func):
     def _execute(obj, *args, **kwargs):
-        with obj.database.atomic('EXCLUSIVE'):
+        with obj.obtain_lock():
             return func(obj, *args, **kwargs)
 
     return _execute
@@ -23,10 +23,13 @@ class MediaFilesQueue(object):
     def __init__(self, path):
         if not os.path.exists(path):
             os.mkdir(path)
-        self.database = SqliteDatabase(os.path.join(path, 'media-files-queue.db'))
-        proxy.initialize(self.database)
+        self.__database = SqliteDatabase(os.path.join(path, 'media-files-queue.db'))
+        proxy.initialize(self.__database)
         proxy.connect()
         MediaFile.create_table(True)
+
+    def obtain_lock(self):
+        return self.__database.atomic('EXCLUSIVE')
 
     def __len__(self):
         return MediaFile.select().count()
@@ -62,7 +65,6 @@ class MediaFilesQueue(object):
                 MediaFile.create(id=key[0], file_path=key[1], status=status, date_added=now, last_modified=now)
             else:
                 raise Exception('media file doesn\'t exist, you must provide both id and file_path')
-
 
     def __getitem__(self, key):
         if isinstance(key, tuple):

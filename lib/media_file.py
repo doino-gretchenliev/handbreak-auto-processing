@@ -41,7 +41,6 @@ class MediaFile(BaseModel):
     @property
     def dict(self):
         def to_json(value):
-            print type(value)
             if isinstance(value, datetime):
                 return value.isoformat()
             elif isinstance(value, uuid.UUID):

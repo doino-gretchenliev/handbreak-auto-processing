@@ -32,7 +32,7 @@ class MediaFilesEventHandler(FileSystemEventHandler):
                 and event.event_type == EVENT_TYPE_CREATED:
             try:
                 file_path = event.src_path.decode('utf-8')
-                with self.mfq.database.atomic('EXCLUSIVE'):
+                with self.mfq.obtain_lock():
                     if file_path not in self.mfq or self.reprocess:
                         id = uuid4()
                         self.mfq[id, file_path] = MediaFileState.WAITING

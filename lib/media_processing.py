@@ -41,7 +41,7 @@ class MediaProcessing(object):
         return result
 
     def delete_media_file(self, media_file):
-        with self.mfq.database.atomic('EXCLUSIVE'):
+        with self.mfq.obtain_lock():
             if media_file in self.mfq and self.mfq[media_file].status != MediaFileState.PROCESSING:
                 del self.mfq[media_file]
             else:
@@ -50,7 +50,7 @@ class MediaProcessing(object):
     def retry_media_files(self, media_file=None):
         if not media_file:
             self.logger.info("Retrying all media files")
-            with self.mfq.database.atomic('EXCLUSIVE'):
+            with self.mfq.obtain_lock():
                 for media_file in self.mfq:
                     self.mfq[media_file.id, media_file.file_path] = MediaFileState.WAITING
         else:
@@ -83,7 +83,7 @@ class MediaProcessing(object):
             for root, dir_names, file_names in os.walk(watch_directory):
                 for filename in file_names:
                     file_path = os.path.join(root, filename).decode('utf-8')
-                    with self.mfq.database.atomic('EXCLUSIVE'):
+                    with self.mfq.obtain_lock():
                         if file_path not in self.mfq or (
                                 file_path in self.mfq
                                 and self.mfq[file_path].status != MediaFileState.FAILED):
