@@ -138,11 +138,11 @@ peewee_logger.level = peewee_logging_level
 
 queue_store_directory = os.path.join(queue_directory, '.handbreak-auto-processing')
 mfq = MediaFilesQueue(queue_store_directory, file_extension)
+rest_api = None
 
 
 def clean_handler(signal, frame):
     logger.info("Processes interrupted by the user exiting [{}], please wait while cleaning up...".format(signal))
-    global rest_api
     if rest_api:
         rest_api.stop()
     if media_processing:
@@ -160,7 +160,6 @@ if __name__ == "__main__":
     )
 
     if web_interface:
-        global rest_api
         rest_api = RestApi(media_processing)
 
     if list_processing_queue:
