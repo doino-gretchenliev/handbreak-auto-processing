@@ -60,9 +60,9 @@ class MediaFilesQueue(object):
             elif status == MediaFileState.FAILED:
                     update_fields['date_finished'] = now
             elif status == MediaFileState.WAITING:
-                update_fields['date_started'] >> None
-                update_fields['date_finished'] >> None
-                update_fields['transcoded_file_size'] >> None
+                update_fields['date_started'] = None
+                update_fields['date_finished'] = None
+                update_fields['transcoded_file_size'] = None
 
             if isinstance(key, tuple):
                 MediaFile.update(update_fields).where(

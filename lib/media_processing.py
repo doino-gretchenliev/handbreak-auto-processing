@@ -54,7 +54,7 @@ class MediaProcessing(object):
                 for media_file in self.mfq:
                     self.mfq[media_file.id, media_file.file_path] = MediaFileState.WAITING
         else:
-            self.logger.info("Retrying [{}] media files".format(media_file))
+            self.logger.info("Retrying [{}] media file".format(media_file))
             self.mfq[media_file] = MediaFileState.WAITING
 
     def start(self):
