@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from humanize import naturalsize, naturaltime
-from peewee import Proxy, Model, UUIDField, DateTimeField, TextField, IntegerField
+from peewee import Proxy, Model, UUIDField, DateTimeField, TextField, BigIntegerField
 
 from lib.media_file_state import MediaFileStateField, MediaFileState
 
@@ -25,8 +25,8 @@ class MediaFile(BaseModel):
     transcoded_file_path = TextField(column_name='transcoded_file_path')
     log_file_path = TextField(column_name='log_file_path')
     status = MediaFileStateField(column_name='status')
-    file_size = IntegerField(column_name='file_sizes')
-    transcoded_file_size = IntegerField(column_name='transcoded_file_size', null=True)
+    file_size = BigIntegerField(column_name='file_sizes')
+    transcoded_file_size = BigIntegerField(column_name='transcoded_file_size', null=True)
     date_added = DateTimeField(column_name='date_added')
     last_modified = DateTimeField(column_name='last_modified', index=True)
     date_started = DateTimeField(column_name='date_started', null=True)

@@ -15,12 +15,18 @@ parser.add_argument('humanize', type=inputs.boolean, help='return humanize resul
 
 @api.route('/')
 class Queue(Resource):
+    parser = api.parser()
+    parser.add_argument('humanize', type=inputs.boolean, help='return humanize results', default=True, required=False)
+    parser.add_argument('full', type=inputs.boolean, help='return full details about every entry', default=True, required=False)
 
     @api.doc(description='get information about media processing queue state')
     @api.expect(parser)
     def get(self):
-        args = parser.parse_args()
-        return mp.mfq.list(args.humanize), 200
+        args = self.parser.parse_args()
+        if args.full:
+            return mp.mfq.list(args.humanize), 200
+        else:
+            return [str(media_file) for media_file in mp.mfq.keys()], 200
 
 
 @api.route('/stats')
@@ -74,7 +80,6 @@ class QueueStats(Resource):
         except TypeError:
             result = items_sum / max(items_count, 1)
         return result
-
 
 
 @api.route('/load')
@@ -140,6 +145,20 @@ class QueueSize(Resource):
 
 @api.route('/<string:id>')
 class QueueSize(Resource):
+
+    @api.doc(description='get information about media file')
+    @api.expect(parser)
+    def get(self, id):
+        args = parser.parse_args()
+        with mp.mfq.obtain_lock():
+            if id in mp.mfq:
+                response = jsonify(mp.mfq[id].dict(args.humanize))
+                response.status_code = 200
+            else:
+                response = jsonify(
+                    'Node [{}] not found'.format(id))
+                response.status_code = 400
+        return response
 
     @api.doc(description='retry a {} media file in processing queue'.format(MediaFileState.FAILED.value))
     def put(self, id):

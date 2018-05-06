@@ -121,7 +121,7 @@ class MediaFilesQueue(object):
     def keys(self):
         result = []
         for media_file in self.__iter__():
-            result.append((media_file.id, media_file.file_path))
+            result.append(media_file.id)
         return result
 
     def values(self):

@@ -6,6 +6,9 @@ import signal
 import sys
 import tempfile
 from os.path import expanduser
+from uuid import uuid4
+import socket
+
 
 from watchdog.observers import Observer
 
@@ -13,6 +16,8 @@ from lib.event_handlers import MediaFilesEventHandler
 from lib.media_file_state import MediaFileState
 from lib.media_processing import MediaProcessing
 from lib.persistent_media_files_queue import MediaFilesQueue
+from lib.nodes.nodes_inventory import NodeInventory
+from lib.nodes.node_state import NodeState
 from lib.rest_api import RestApi
 
 DEFAULT_INCLUDE_PATTERN = ['*.mp4', '*.mpg', '*.mov', '*.mkv', '*.avi']
@@ -138,6 +143,8 @@ peewee_logger.level = peewee_logging_level
 
 queue_store_directory = os.path.join(queue_directory, '.handbreak-auto-processing')
 mfq = MediaFilesQueue(queue_store_directory, file_extension)
+nodes = NodeInventory(queue_store_directory)
+
 rest_api = None
 
 
@@ -147,10 +154,16 @@ def clean_handler(signal, frame):
         rest_api.stop()
     if media_processing:
         media_processing.stop()
+    with nodes.obtain_lock():
+        if socket.gethostname() in nodes:
+            nodes[socket.gethostname()] = NodeState.OFFLINE
+        else:
+            nodes[uuid4(), socket.gethostname()] = NodeState.OFFLINE
     exit(0)
 
 
 if __name__ == "__main__":
+    nodes[uuid4(), socket.gethostname()] = NodeState.ONLINE
     media_processing = MediaProcessing(
         mfq,
         handbreak_command,
@@ -160,7 +173,7 @@ if __name__ == "__main__":
     )
 
     if web_interface:
-        rest_api = RestApi(media_processing)
+        rest_api = RestApi(media_processing, nodes)
 
     if list_processing_queue:
         if len(mfq) > 0:
