@@ -1,5 +1,7 @@
 from threading import Thread
+
 from werkzeug.serving import make_server
+
 
 class FlaskAppWrapper(Thread):
 

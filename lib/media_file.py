@@ -1,10 +1,10 @@
 import uuid
 from datetime import datetime
 
+from humanize import naturalsize, naturaltime
 from peewee import Proxy, Model, UUIDField, DateTimeField, TextField, IntegerField
 
 from lib.media_file_state import MediaFileStateField, MediaFileState
-from humanize import naturalsize, naturaldelta, intword, naturaltime
 
 proxy = Proxy()
 
@@ -37,7 +37,7 @@ class MediaFile(BaseModel):
             klass=self.__class__.__name__,
             id=id(self) & 0xFFFFFF,
             attrs=" ".join("{}={!r}".format(k, v) for k, v in self.__data__.items()),
-            )
+        )
 
     @property
     def identifier(self):

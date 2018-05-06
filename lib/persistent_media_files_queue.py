@@ -3,6 +3,7 @@ import logging
 import os
 
 from peewee import SqliteDatabase
+
 from lib.media_file import MediaFile
 from lib.media_file import proxy
 from lib.media_file_state import MediaFileState

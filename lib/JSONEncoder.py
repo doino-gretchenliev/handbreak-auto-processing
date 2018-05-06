@@ -1,6 +1,4 @@
 from flask.json import JSONEncoder
-import calendar
-from datetime import datetime
 
 from lib.media_file_state import MediaFileState
 
