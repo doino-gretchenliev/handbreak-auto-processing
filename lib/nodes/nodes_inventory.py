@@ -38,11 +38,18 @@ class NodeInventory(object):
         return Node.select().count()
 
     @transaction
-    def __delitem__(self, key):
+    def __delitem__(self, key, safe=True):
         if isinstance(key, tuple):
-            Node.delete().where(Node.id == key[0]).where(Node.hostname == key[1]).execute()
+            if safe:
+                query = (Node.id == key[0]) & (Node.hostname == key[1]) & (Node.status != NodeState.ONLINE)
+            else:
+                query = (Node.id == key[0]) & (Node.hostname == key[1])
         else:
-            Node.delete().where((Node.id == key) | (Node.hostname == key)).execute()
+            if safe:
+                query = ((Node.id == key) | (Node.hostname == key)) & (Node.status != NodeState.ONLINE)
+            else:
+                query = (Node.id == key) | (Node.hostname == key)
+        Node.delete().where(query).execute()
 
     @transaction
     def __setitem__(self, key, status):

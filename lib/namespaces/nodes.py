@@ -1,5 +1,6 @@
 from flask import jsonify, request
 from flask_restplus import Resource, Namespace, inputs, fields
+from lib.nodes.node_state import NodeState
 import re
 
 TIME_RANGE_PATTERN = re.compile("^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]-([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$")
@@ -43,11 +44,14 @@ class Node(Resource):
                 response.status_code = 404
         return response
 
-    @api.doc(description='delete processing node')
+    @api.doc(description="delete processing node(only if it's not [{}])".format(NodeState.ONLINE))
     def delete(self, id):
         try:
             del ni[id]
-            response = jsonify('Node [{}] deleted'.format(id))
+            if id in ni:
+                response = jsonify('Node [{}] not deleted'.format(id))
+            else:
+                response = jsonify('Node [{}] deleted'.format(id))
             response.status_code = 200
         except Exception:
             response = jsonify(
