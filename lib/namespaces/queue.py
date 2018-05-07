@@ -138,7 +138,7 @@ class QueueSize(Resource):
 class QueueSize(Resource):
 
     @api.doc(description='retry all {} media files in processing queue'.format(MediaFileState.FAILED.value))
-    def put(self):
+    def post(self):
         mp.retry_media_files()
         return 'all {} files retried'.format(MediaFileState.FAILED.value), 200
 
@@ -161,7 +161,7 @@ class QueueSize(Resource):
         return response
 
     @api.doc(description='retry a {} media file in processing queue'.format(MediaFileState.FAILED.value))
-    def put(self, id):
+    def post(self, id):
         try:
             mp.retry_media_files(media_file=id)
             return 'Media file [{}] retried'.format(id), 200

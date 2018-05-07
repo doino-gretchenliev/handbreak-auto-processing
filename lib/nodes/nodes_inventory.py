@@ -41,12 +41,12 @@ class NodeInventory(object):
     def __delitem__(self, key, safe=True):
         if isinstance(key, tuple):
             if safe:
-                query = (Node.id == key[0]) & (Node.hostname == key[1]) & (Node.status != NodeState.ONLINE)
+                query = (Node.id == key[0]) & (Node.hostname == key[1]) & (Node.status == NodeState.OFFLINE)
             else:
                 query = (Node.id == key[0]) & (Node.hostname == key[1])
         else:
             if safe:
-                query = ((Node.id == key) | (Node.hostname == key)) & (Node.status != NodeState.ONLINE)
+                query = ((Node.id == key) | (Node.hostname == key)) & (Node.status == NodeState.OFFLINE)
             else:
                 query = (Node.id == key) | (Node.hostname == key)
         Node.delete().where(query).execute()
@@ -65,9 +65,9 @@ class NodeInventory(object):
 
         if self.__contains__(key):
             if isinstance(key, tuple):
-                Node.update(set_fields).where(Node.hostname == key[1]).execute()
+                Node.update(set_fields).where((Node.id == key[1]) | (Node.hostname == key[1])).execute()
             else:
-                Node.update(set_fields).where(Node.hostname == key).execute()
+                Node.update(set_fields).where((Node.id == key) | (Node.hostname == key)).execute()
         else:
             if isinstance(key, tuple):
                 info = cpuinfo.get_cpu_info()

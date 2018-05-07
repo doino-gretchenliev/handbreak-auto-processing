@@ -21,7 +21,6 @@ class MediaProcessingThread(Thread):
 
         self.logger = logging.getLogger(__name__)
 
-        self.start_execution_time = None
         self.system_call_thread = None
         self.current_processing_file = None
         self.mfq = mfq
@@ -30,7 +29,6 @@ class MediaProcessingThread(Thread):
         self.delete_orig_file = delete_orig_file
 
     def run(self):
-        self.start_execution_time = time.time()
         self.__process_media_file()
 
     def join(self, timeout=None):
@@ -38,7 +36,6 @@ class MediaProcessingThread(Thread):
             self.system_call_thread.kill()
             self.system_call_thread.join()
         super(MediaProcessingThread, self).join(timeout)
-        self.start_execution_time = None
 
     def suspend_media_processing(self):
         try:
@@ -53,12 +50,6 @@ class MediaProcessingThread(Thread):
             self.logger.info("Media processing is resumed")
         except Exception:
             self.logger.warn("Media processing is already running")
-
-    def get_processing_time(self):
-        if self.start_execution_time:
-            return time.time() - self.start_execution_time
-        else:
-            raise Exception("process is not running")
 
     def __process_media_file(self):
         self.__get_media_file()

@@ -44,7 +44,7 @@ class Node(Resource):
                 response.status_code = 404
         return response
 
-    @api.doc(description="delete processing node(only if it's not [{}])".format(NodeState.ONLINE))
+    @api.doc(description="delete processing node(only if it's [{}])".format(NodeState.OFFLINE))
     def delete(self, id):
         try:
             del ni[id]
@@ -112,3 +112,36 @@ class NodeSilentPeriods(Resource):
                 'Node [{}] not found'.format(id))
             response.status_code = 404
         return response
+
+
+@api.route('/<string:id>/suspend')
+class NodeSuspend(Resource):
+
+    @api.doc(description='suspends media processing on node')
+    def put(self, id):
+        try:
+            ni[id] = NodeState.SUSPENDED
+            response = jsonify('Node [{}] suspended'.format(id))
+            response.status_code = 200
+        except Exception:
+            response = jsonify(
+                'Node [{}] not found'.format(id))
+            response.status_code = 404
+        return response
+
+
+@api.route('/<string:id>/resume')
+class NodeResume(Resource):
+
+    @api.doc(description='resumes media processing on node')
+    def put(self, id):
+        try:
+            ni[id] = NodeState.ONLINE
+            response = jsonify('Node [{}] resumed'.format(id))
+            response.status_code = 200
+        except Exception:
+            response = jsonify(
+                'Node [{}] not found'.format(id))
+            response.status_code = 404
+        return response
+

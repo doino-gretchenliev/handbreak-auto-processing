@@ -12,7 +12,7 @@ from watchdog.events import FileSystemEvent
 from lib.utils import compare_list
 from lib.media_file_processing import MediaProcessingThread
 from lib.media_file_state import MediaFileState
-
+from lib.nodes.node_state import NodeState
 
 class MediaProcessing(object):
     SCAN_FOR_NEW_MEDIA_FILES_FOR_PROCESSING_TIMEOUT = 10
@@ -34,6 +34,7 @@ class MediaProcessing(object):
         self.lock = threading.Lock()
         self.nodes = nodes
         self.last_silent_periods = None
+        self.suspended = False
 
     def get_queue_files(self):
         result = {}
@@ -68,7 +69,8 @@ class MediaProcessing(object):
                                                                 name=MediaProcessingThread.__module__)
                 self.system_call_thread.start()
                 while self.system_call_thread.isAlive():
-                    self.schedule_silent_periods()
+                    self.__check_media_processing_state()
+                    self.__schedule_silent_periods()
                     time.sleep(10)
                 self.system_call_thread = None
             time.sleep(self.SCAN_FOR_NEW_MEDIA_FILES_FOR_PROCESSING_TIMEOUT)
@@ -92,7 +94,17 @@ class MediaProcessing(object):
                             file_event.event_type = EVENT_TYPE_CREATED
                             event_handler.on_any_event(file_event)
 
-    def schedule_silent_periods(self):
+    def __check_media_processing_state(self):
+        if not self.suspended and self.nodes[socket.gethostname()].status == NodeState.SUSPENDED:
+            self.__suspend_media_processing()
+            self.suspended = True
+        elif self.suspended and self.nodes[socket.gethostname()].status == NodeState.ONLINE:
+            self.__resume_media_processing()
+            self.suspended = False
+
+
+
+    def __schedule_silent_periods(self):
         periods = self.nodes.get_silent_periods(socket.gethostname())
         if not self.last_silent_periods or not compare_list(self.last_silent_periods, periods):
             schedule.clear()
@@ -101,19 +113,19 @@ class MediaProcessing(object):
                 starting_time = dateutil.parser.parse(split_period[0])
                 end_time = dateutil.parser.parse(split_period[1])
 
-                schedule.every().day.at(starting_time.strftime("%H:%M")).do(self.suspend_media_processing)
-                schedule.every().day.at(end_time.strftime("%H:%M")).do(self.resume_media_processing)
+                schedule.every().day.at(starting_time.strftime("%H:%M")).do(self.__suspend_media_processing)
+                schedule.every().day.at(end_time.strftime("%H:%M")).do(self.__resume_media_processing)
             self.last_silent_periods = periods
             self.logger.debug("new silent periods rescheduled {}".format(periods))
         schedule.run_pending()
 
-    def suspend_media_processing(self):
+    def __suspend_media_processing(self):
         if self.system_call_thread:
             self.system_call_thread.suspend_media_processing()
         else:
             raise Exception('no running media processing found')
 
-    def resume_media_processing(self):
+    def __resume_media_processing(self):
         if self.system_call_thread:
             self.system_call_thread.resume_media_processing()
         else:

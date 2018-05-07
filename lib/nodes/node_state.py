@@ -5,6 +5,7 @@ from peewee import CharField
 class NodeState(Enum):
     ONLINE = "online"
     OFFLINE = "offline"
+    SUSPENDED = "suspended"
 
 
 class NodeStateField(CharField):
