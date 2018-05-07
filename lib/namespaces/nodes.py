@@ -1,6 +1,8 @@
-from flask import jsonify
-from flask_restplus import Resource, Namespace, inputs
+from flask import jsonify, request
+from flask_restplus import Resource, Namespace, inputs, fields
+import re
 
+TIME_RANGE_PATTERN = re.compile("^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]-([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$")
 
 ni = None
 api = Namespace('nodes', description='Control processing nodes')
@@ -38,7 +40,7 @@ class Node(Resource):
             else:
                 response = jsonify(
                     'Node [{}] not found'.format(id))
-                response.status_code = 400
+                response.status_code = 404
         return response
 
     @api.doc(description='delete processing node')
@@ -50,8 +52,59 @@ class Node(Resource):
         except Exception:
             response = jsonify(
                 'Node [{}] not found'.format(id))
-            response.status_code = 400
+            response.status_code = 404
         return response
 
 
+@api.route('/<string:id>/silent')
+class NodeSilentPeriods(Resource):
 
+    @api.doc(description='get currently configured silent periods for node')
+    def get(self, id):
+        try:
+            response = jsonify(ni.get_silent_periods(id))
+            response.status_code = 200
+        except Exception:
+            import logging
+            logging.exception("kj")
+            response = jsonify(
+                'Node [{}] not found'.format(id))
+            response.status_code = 404
+        return response
+
+    silent_periods = api.model('silent_periods', {
+        'silent_periods': fields.List(fields.String(title='silent_period'), required=True, unique=True,
+                            title='silent_periods',
+                            description='Silent periods list', example=
+                            ['12:00-16:00', '22:00-07:00'])
+    })
+
+    @api.doc(description='set silent periods for node')
+    @api.expect(silent_periods)
+    def put(self, id):
+        args = request.get_json()
+        for time_range in args['silent_periods']:
+            if not TIME_RANGE_PATTERN.match(time_range):
+                return "time range [{}] doesn\'t match format".format(time_range), 400
+
+        try:
+            ni.set_silent_periods(id, args['silent_periods'])
+            response = jsonify('Node [{}] silent periods set'.format(id))
+            response.status_code = 200
+        except Exception:
+            response = jsonify(
+                'Node [{}] not found'.format(id))
+            response.status_code = 404
+        return response
+
+    @api.doc(description='clear currently configured silent periods for node')
+    def delete(self, id):
+        try:
+            ni.clear_silent_periods(id)
+            response = jsonify('Node [{}] silent periods cleared'.format(id))
+            response.status_code = 200
+        except Exception:
+            response = jsonify(
+                'Node [{}] not found'.format(id))
+            response.status_code = 404
+        return response

@@ -1,3 +1,5 @@
+import collections
+
 def pretty_time_delta(seconds):
     sign_string = '-' if seconds < 0 else ''
     seconds = abs(int(seconds))
@@ -12,4 +14,8 @@ def pretty_time_delta(seconds):
         return '%s%dm%ds' % (sign_string, minutes, seconds)
     else:
         return '%s%ds' % (sign_string, seconds)
+
+
+def compare_list(first, second):
+    return collections.Counter(first) == collections.Counter(second)
 

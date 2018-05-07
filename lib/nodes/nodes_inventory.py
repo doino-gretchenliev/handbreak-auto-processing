@@ -8,6 +8,7 @@ from lib.nodes.node import Node
 from lib.nodes.node import proxy
 from lib.nodes.node_state import NodeState
 import cpuinfo
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +125,7 @@ class NodeInventory(object):
         else:
             result = Node.select().first()
         if not result:
-            raise Exception('no media file found')
+            raise Exception('node not found')
         return result
 
     @transaction
@@ -136,3 +137,24 @@ class NodeInventory(object):
 
     def list(self, humanize=False):
         return [ node.dict(humanize) for node in Node ]
+
+    @transaction
+    def set_silent_periods(self, key, silent_periods):
+        if self.__contains__(key):
+            Node.update(silent_periods=json.dumps(silent_periods)).where((Node.id == key) | (Node.hostname == key)).execute()
+        else:
+            raise Exception('node not found')
+
+    @transaction
+    def get_silent_periods(self, key):
+        if self.__contains__(key):
+            return json.loads(Node.select().where((Node.id == key) | (Node.hostname == key)).first().silent_periods)
+        else:
+            raise Exception('node not found')
+
+    @transaction
+    def clear_silent_periods(self, key):
+        if self.__contains__(key):
+            Node.update(silent_periods=None).where(Node.id == key).execute()
+        else:
+            raise Exception('node not found')

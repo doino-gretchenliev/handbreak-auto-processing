@@ -157,7 +157,7 @@ class QueueSize(Resource):
             else:
                 response = jsonify(
                     'Node [{}] not found'.format(id))
-                response.status_code = 400
+                response.status_code = 404
         return response
 
     @api.doc(description='retry a {} media file in processing queue'.format(MediaFileState.FAILED.value))
@@ -177,5 +177,5 @@ class QueueSize(Resource):
         except Exception:
             response = jsonify(
                 'Media file [{}] not found or in status [{}]'.format(id, MediaFileState.PROCESSING.value))
-            response.status_code = 400
+            response.status_code = 404
         return response

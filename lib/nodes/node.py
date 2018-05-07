@@ -27,6 +27,7 @@ class Node(BaseModel):
     date_become_offline = DateTimeField(column_name='date_become_offline', null=True)
     cpu_threads = IntegerField(column_name='cpu_threads')
     cpu_details = CharField(column_name='cpu')
+    silent_periods = TextField(column_name='silent_periods', null=True)
 
     def __repr__(self):
         return "<{klass} @{id:x} {attrs}>".format(

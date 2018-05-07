@@ -8,7 +8,8 @@ import tempfile
 from os.path import expanduser
 from uuid import uuid4
 import socket
-
+import schedule
+import dateutil
 
 from watchdog.observers import Observer
 
@@ -163,13 +164,17 @@ def clean_handler(signal, frame):
 
 
 if __name__ == "__main__":
-    nodes[uuid4(), socket.gethostname()] = NodeState.ONLINE
+    node_id = uuid4()
+    nodes[node_id, socket.gethostname()] = NodeState.ONLINE
+    if silent_period:
+        nodes.set_silent_periods(socket.gethostname(), silent_period)
+
     media_processing = MediaProcessing(
         mfq,
         handbreak_command,
         handbreak_timeout,
-        delete,
-        silent_period
+        nodes,
+        delete
     )
 
     if web_interface:
@@ -207,7 +212,6 @@ if __name__ == "__main__":
     if initial_processing:
         media_processing.initial_processing(watch_directories, event_handler)
 
-    global observers
     for watch_directory in watch_directories:
         observer = Observer()
         observer.schedule(event_handler, watch_directory, recursive=True)
