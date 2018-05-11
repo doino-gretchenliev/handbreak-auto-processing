@@ -147,6 +147,7 @@ mfq = MediaFilesQueue(queue_store_directory, file_extension)
 nodes = NodeInventory(queue_store_directory)
 
 rest_api = None
+observers_list = []
 
 
 def clean_handler(signal, frame):
@@ -155,6 +156,9 @@ def clean_handler(signal, frame):
         rest_api.stop()
     if media_processing:
         media_processing.stop()
+    for observer in observers_list:
+        observer.stop()
+        observer.join()
     with nodes.obtain_lock():
         if socket.gethostname() in nodes:
             nodes[socket.gethostname()] = NodeState.OFFLINE
@@ -217,6 +221,7 @@ if __name__ == "__main__":
         observer.schedule(event_handler, watch_directory, recursive=True)
         observer.setDaemon(True)
         observer.start()
+        observers_list.append(observer)
 
     # start media files processing
     media_processing.start()
