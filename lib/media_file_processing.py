@@ -1,6 +1,5 @@
 import logging
 import os
-import time
 from threading import Thread
 from threading import Timer
 
@@ -62,7 +61,8 @@ class MediaProcessingThread(Thread):
 
                 self.logger.info("File [{}] processed successfully".format(self.current_processing_file.identifier))
                 self.logger.debug(self.current_processing_file)
-                self.mfq[self.current_processing_file.id, self.current_processing_file.file_path] = MediaFileState.PROCESSED
+                self.mfq[
+                    self.current_processing_file.id, self.current_processing_file.file_path] = MediaFileState.PROCESSED
                 self.current_processing_file = None
             except HandbreakProcessInterrupted:
                 self.__return_current_processing_file(MediaFileState.WAITING)
@@ -123,7 +123,8 @@ class MediaProcessingThread(Thread):
         try:
             with self.mfq.obtain_lock():
                 self.current_processing_file = self.mfq.peek(MediaFileState.WAITING)
-                self.mfq[self.current_processing_file.id, self.current_processing_file.file_path] = MediaFileState.PROCESSING
+                self.mfq[
+                    self.current_processing_file.id, self.current_processing_file.file_path] = MediaFileState.PROCESSING
         except Exception:
             self.logger.warn("Can't obtain media file to process")
 
@@ -134,4 +135,3 @@ class MediaProcessingThread(Thread):
                 "File [{}] returned to processing queue, status [{}]".format(self.current_processing_file.identifier,
                                                                              media_file_state.value))
             self.logger.debug(self.current_processing_file)
-

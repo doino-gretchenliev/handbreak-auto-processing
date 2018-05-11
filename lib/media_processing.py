@@ -1,18 +1,19 @@
 import logging
 import os
+import socket
 import threading
 import time
-import socket
 
 import dateutil.parser
 import schedule
 from watchdog.events import EVENT_TYPE_CREATED
 from watchdog.events import FileSystemEvent
 
-from lib.utils import compare_list
 from lib.media_file_processing import MediaProcessingThread
 from lib.media_file_state import MediaFileState
 from lib.nodes.node_state import NodeState
+from lib.utils import compare_list
+
 
 class MediaProcessing(object):
     SCAN_FOR_NEW_MEDIA_FILES_FOR_PROCESSING_TIMEOUT = 10
@@ -101,8 +102,6 @@ class MediaProcessing(object):
         elif self.suspended and self.nodes[socket.gethostname()].status == NodeState.ONLINE:
             self.__resume_media_processing()
             self.suspended = False
-
-
 
     def __schedule_silent_periods(self):
         periods = self.nodes.get_silent_periods(socket.gethostname())

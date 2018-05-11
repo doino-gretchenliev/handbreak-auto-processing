@@ -59,7 +59,7 @@ class MediaFilesQueue(object):
                     logger.warn("Unable to obtain transcoded file size [{}]".format(transcoded_file_path))
                 update_fields['date_finished'] = now
             elif status == MediaFileState.FAILED:
-                    update_fields['date_finished'] = now
+                update_fields['date_finished'] = now
             elif status == MediaFileState.WAITING:
                 update_fields['date_started'] = None
                 update_fields['date_finished'] = None
@@ -166,4 +166,4 @@ class MediaFilesQueue(object):
             MediaFile.delete().execute()
 
     def list(self, humanize=False):
-        return [ media_file.dict(humanize) for media_file in MediaFile ]
+        return [media_file.dict(humanize) for media_file in MediaFile]

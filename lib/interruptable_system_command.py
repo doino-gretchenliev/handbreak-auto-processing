@@ -70,5 +70,3 @@ class InterruptableSystemCommandThread(Thread):
         for io in ready_to_read:
             line = io.readline()
             self.logger.log(self.log_levels[io], line[:-1])
-
-

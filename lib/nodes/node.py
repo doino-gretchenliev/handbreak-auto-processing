@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from humanize import naturalsize, naturaltime, apnumber
+from humanize import naturaltime, apnumber
 from peewee import Proxy, Model, UUIDField, DateTimeField, TextField, IntegerField, CharField
 
 from lib.nodes.node_state import NodeState, NodeStateField

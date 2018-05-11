@@ -17,7 +17,8 @@ parser.add_argument('humanize', type=inputs.boolean, help='return humanize resul
 class Queue(Resource):
     parser = api.parser()
     parser.add_argument('humanize', type=inputs.boolean, help='return humanize results', default=True, required=False)
-    parser.add_argument('full', type=inputs.boolean, help='return full details about every entry', default=True, required=False)
+    parser.add_argument('full', type=inputs.boolean, help='return full details about every entry', default=True,
+                        required=False)
 
     @api.doc(description='get information about media processing queue state')
     @api.expect(parser)
@@ -66,11 +67,16 @@ class QueueStats(Resource):
 
         return {
             'processed_today': apnumber(processed_today) if args.humanize else processed_today,
-            'average_processed_per_day':  apnumber(average_processed_per_day) if args.humanize else str(average_processed_per_day),
-            'average_processing_time': naturaldelta(average_processing_time) if args.humanize else str(average_processing_time),
-            'average_processed_file_size': naturalsize(average_processed_file_size) if args.humanize else average_processed_file_size,
-            'average_input_file_size': naturalsize(average_input_file_size) if args.humanize else average_input_file_size,
-            'input_to_processed_file_size_ratio':  fractional(input_to_processed_file_size_ratio) if args.humanize else input_to_processed_file_size_ratio
+            'average_processed_per_day': apnumber(average_processed_per_day) if args.humanize else str(
+                average_processed_per_day),
+            'average_processing_time': naturaldelta(average_processing_time) if args.humanize else str(
+                average_processing_time),
+            'average_processed_file_size': naturalsize(
+                average_processed_file_size) if args.humanize else average_processed_file_size,
+            'average_input_file_size': naturalsize(
+                average_input_file_size) if args.humanize else average_input_file_size,
+            'input_to_processed_file_size_ratio': fractional(
+                input_to_processed_file_size_ratio) if args.humanize else input_to_processed_file_size_ratio
         }
 
     @staticmethod
@@ -168,7 +174,8 @@ class QueueSize(Resource):
         except Exception:
             return 'Media file [{}] not found'.format(id), 404
 
-    @api.doc(description='delete a media file(not in [{}]) from processing queue'.format(MediaFileState.PROCESSING.value))
+    @api.doc(
+        description='delete a media file(not in [{}]) from processing queue'.format(MediaFileState.PROCESSING.value))
     def delete(self, id):
         try:
             mp.delete_media_file(id)

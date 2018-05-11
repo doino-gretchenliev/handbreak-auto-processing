@@ -3,8 +3,8 @@ from flask_restplus import Api
 
 from lib.JSONEncoder import JSONEncoder
 from lib.flask_thread import FlaskAppWrapper
-from lib.namespaces import queue
 from lib.namespaces import nodes
+from lib.namespaces import queue
 
 app = Flask("ok")
 app.json_encoder = JSONEncoder
@@ -27,4 +27,3 @@ class RestApi(object):
 
     def stop(self):
         self.flask_process.join()
-

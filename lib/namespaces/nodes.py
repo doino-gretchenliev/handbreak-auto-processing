@@ -1,7 +1,9 @@
+import re
+
 from flask import jsonify, request
 from flask_restplus import Resource, Namespace, inputs, fields
+
 from lib.nodes.node_state import NodeState
-import re
 
 TIME_RANGE_PATTERN = re.compile("^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]-([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$")
 
@@ -13,7 +15,8 @@ api = Namespace('nodes', description='Control processing nodes')
 class Nodes(Resource):
     parser = api.parser()
     parser.add_argument('humanize', type=inputs.boolean, help='return humanize results', default=True, required=False)
-    parser.add_argument('full', type=inputs.boolean, help='return full details about every entry', default=True, required=False)
+    parser.add_argument('full', type=inputs.boolean, help='return full details about every entry', default=True,
+                        required=False)
 
     @api.doc(description='get information about all processing nodes')
     @api.expect(parser)
@@ -78,9 +81,9 @@ class NodeSilentPeriods(Resource):
 
     silent_periods = api.model('silent_periods', {
         'silent_periods': fields.List(fields.String(title='silent_period'), required=True, unique=True,
-                            title='silent_periods',
-                            description='Silent periods list', example=
-                            ['12:00-16:00', '22:00-07:00'])
+                                      title='silent_periods',
+                                      description='Silent periods list', example=
+                                      ['12:00-16:00', '22:00-07:00'])
     })
 
     @api.doc(description='set silent periods for node')
@@ -144,4 +147,3 @@ class NodeResume(Resource):
                 'Node [{}] not found'.format(id))
             response.status_code = 404
         return response
-

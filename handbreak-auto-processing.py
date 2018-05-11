@@ -3,22 +3,20 @@ import argparse
 import logging.handlers
 import os
 import signal
+import socket
 import sys
 import tempfile
 from os.path import expanduser
 from uuid import uuid4
-import socket
-import schedule
-import dateutil
 
 from watchdog.observers import Observer
 
 from lib.event_handlers import MediaFilesEventHandler
 from lib.media_file_state import MediaFileState
 from lib.media_processing import MediaProcessing
-from lib.persistent_media_files_queue import MediaFilesQueue
-from lib.nodes.nodes_inventory import NodeInventory
 from lib.nodes.node_state import NodeState
+from lib.nodes.nodes_inventory import NodeInventory
+from lib.persistent_media_files_queue import MediaFilesQueue
 from lib.rest_api import RestApi
 
 DEFAULT_INCLUDE_PATTERN = ['*.mp4', '*.mpg', '*.mov', '*.mkv', '*.avi']

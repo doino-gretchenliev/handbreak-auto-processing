@@ -1,14 +1,14 @@
 import datetime
+import json
 import logging
 import os
 
+import cpuinfo
 from peewee import SqliteDatabase
 
 from lib.nodes.node import Node
 from lib.nodes.node import proxy
 from lib.nodes.node_state import NodeState
-import cpuinfo
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -143,12 +143,13 @@ class NodeInventory(object):
             Node.delete().execute()
 
     def list(self, humanize=False):
-        return [ node.dict(humanize) for node in Node ]
+        return [node.dict(humanize) for node in Node]
 
     @transaction
     def set_silent_periods(self, key, silent_periods):
         if self.__contains__(key):
-            Node.update(silent_periods=json.dumps(silent_periods)).where((Node.id == key) | (Node.hostname == key)).execute()
+            Node.update(silent_periods=json.dumps(silent_periods)).where(
+                (Node.id == key) | (Node.hostname == key)).execute()
         else:
             raise Exception('node not found')
 
