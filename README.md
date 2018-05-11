@@ -61,7 +61,7 @@ processing log file: `~/Movies/movie-name_transcoding.log`
 | ['-s', '--case-sensitive'] | False | N/A | depends on the filesystem | Whether pattern matching should be case sensitive | 
 | ['-v', '--verbose'] | False | N/A | False | Enable verbose log output | 
 | ['-m', '--max-log-size'] | False | N/A | 100 | Max log size in MB; set to 0 to disable log file rotating | 
-| ['-k', '--max-log-file-to-keep'] | False | N/A | 1 | Max number of log files to keep | 
+| ['-k', '--max-log-file-to-keep'] | False | N/A | 0 | Max number of log files to keep | 
 | ['-c', '--handbreak-command'] | False | N/A | None | Handbreak command to execute | 
 | ['-t', '--handbreak-timeout'] | False | N/A | 15 | Timeout of Handbreak command(hours) | 
 | ['-f', '--file-extension'] | False | N/A | mp4 | Output file extension | 

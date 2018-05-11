@@ -73,7 +73,7 @@ parser.add_argument("-v", "--verbose", action='count', help="Enable verbose log 
 parser.add_argument('-m', '--max-log-size', help='Max log size in MB; set to 0 to disable log file rotating\n'
                                                  '(default: 100)', default=100)
 parser.add_argument('-k', '--max-log-file-to-keep', help='Max number of log files to keep\n'
-                                                         '(default: 1)', default=1)
+                                                         '(default: 0)', default=0)
 
 list_command_group.add_argument('-c', '--handbreak-command', help='Handbreak command to execute')
 parser.add_argument('-t', '--handbreak-timeout', help='Timeout of Handbreak command(hours)\n'
