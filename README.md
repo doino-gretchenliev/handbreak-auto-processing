@@ -67,4 +67,4 @@ processing log file: `~/Movies/movie-name_transcoding.log`
 | ['-f', '--file-extension'] | False | N/A | mp4 | Output file extension | 
 | ['-d', '--delete'] | False | N/A | False | Delete original file |   
 | ['-z', '--silent-period'] | False | N/A | None | A silent period(the media processing command will be suspended) defined as so: [18:45:20:45]. You can provide multiple periods |
-		
+| ['-x', '--rest-api'] | False | N/A | False | Enable REST API mapped on port 6000 |

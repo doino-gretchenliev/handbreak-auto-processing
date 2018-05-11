@@ -69,8 +69,7 @@ parser.add_argument('-s', '--case-sensitive', help='Whether pattern matching sho
 parser.add_argument('-z', '--silent-period',
                     help='A silent period(the media processing command will be suspended) defined as so: [18:45:20:45]. '
                          'You can provide multiple periods', action='append')
-parser.add_argument("-x", "--web-interface", action="store_true", default=False,
-                    help="Enable REST API on port 6767. NOTE: limited functionality")
+parser.add_argument("-x", "--rest-api", action="store_true", default=False, help="Enable REST API on port 6000")
 
 parser.add_argument("-v", "--verbose", action='count', help="Enable verbose log output")
 parser.add_argument('-m', '--max-log-size', help='Max log size in MB; set to 0 to disable log file rotating\n'
