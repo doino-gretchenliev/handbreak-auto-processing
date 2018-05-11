@@ -110,7 +110,7 @@ retry_all_media_files = args.retry_all_media_files
 initial_processing = args.initial_processing
 reprocess = args.reprocess
 silent_period = args.silent_period
-web_interface = args.web_interface
+enable_rest_api = args.rest_api
 
 # Logging setup
 formatter = logging.Formatter('[%(asctime)-15s] [%(threadName)s] [%(levelname)s]: %(message)s')
@@ -178,7 +178,7 @@ if __name__ == "__main__":
         delete
     )
 
-    if web_interface:
+    if enable_rest_api:
         rest_api = RestApi(media_processing, nodes)
 
     if list_processing_queue:
