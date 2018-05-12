@@ -33,8 +33,8 @@ class MediaFilesEventHandler(FileSystemEventHandler):
                 and event.event_type == EVENT_TYPE_CREATED:
             try:
                 file_path = event.src_path.decode('utf-8')
-                if file_path not in self.mfq or self.reprocess:
-                    media_file = self.add_to_processing_queue(file_path)
+                media_file = self.add_to_processing_queue(file_path)
+                if media_file:
                     logger.info("File [{}] added to processing queue".format(media_file.identifier))
                     logger.debug(media_file)
             except Exception:
@@ -42,6 +42,7 @@ class MediaFilesEventHandler(FileSystemEventHandler):
 
     @ConnectionManager.connection(transaction=True)
     def add_to_processing_queue(self, file_path):
-        id = uuid4()
-        self.mfq[id, file_path] = MediaFileState.WAITING
-        return self.mfq[id, file_path]
+        if file_path not in self.mfq or self.reprocess:
+            id = uuid4()
+            self.mfq[id, file_path] = MediaFileState.WAITING
+            return self.mfq[id, file_path]
