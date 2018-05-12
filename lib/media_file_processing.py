@@ -6,7 +6,7 @@ from threading import Timer
 from lib.exceptions import HandbreakProcessInterrupted
 from lib.interruptable_system_command import InterruptableSystemCommandThread
 from lib.media_file_state import MediaFileState
-
+from lib.connection_manager import ConnectionManager
 
 class MediaProcessingThread(Thread):
 
@@ -119,12 +119,12 @@ class MediaProcessingThread(Thread):
         else:
             raise Exception("Handbreak processes killed after {} hours".format(self.handbreak_timeout / 60 / 60))
 
+    @ConnectionManager.connection(transaction=True)
     def __get_media_file(self):
         try:
-            with self.mfq.obtain_lock():
-                self.current_processing_file = self.mfq.peek(MediaFileState.WAITING)
-                self.mfq[
-                    self.current_processing_file.id, self.current_processing_file.file_path] = MediaFileState.PROCESSING
+            self.current_processing_file = self.mfq.peek(MediaFileState.WAITING)
+            self.mfq[
+                self.current_processing_file.id, self.current_processing_file.file_path] = MediaFileState.PROCESSING
         except Exception:
             self.logger.warn("Can't obtain media file to process")
 

@@ -6,6 +6,7 @@ from watchdog.events import EVENT_TYPE_CREATED
 from watchdog.events import FileSystemEventHandler
 
 from lib.media_file_state import MediaFileState
+from lib.connection_manager import ConnectionManager
 
 logger = logging.getLogger(__name__)
 
@@ -32,12 +33,15 @@ class MediaFilesEventHandler(FileSystemEventHandler):
                 and event.event_type == EVENT_TYPE_CREATED:
             try:
                 file_path = event.src_path.decode('utf-8')
-                with self.mfq.obtain_lock():
-                    if file_path not in self.mfq or self.reprocess:
-                        id = uuid4()
-                        self.mfq[id, file_path] = MediaFileState.WAITING
-                        media_file = self.mfq[id, file_path]
-                        logger.info("File [{}] added to processing queue".format(media_file.identifier))
-                        logger.debug(media_file)
+                if file_path not in self.mfq or self.reprocess:
+                    media_file = self.add_to_processing_queue(file_path)
+                    logger.info("File [{}] added to processing queue".format(media_file.identifier))
+                    logger.debug(media_file)
             except Exception:
                 logger.exception("An error occurred during adding of [{}] to processing queue".format(file_path))
+
+    @ConnectionManager.connection(transaction=True)
+    def add_to_processing_queue(self, file_path):
+        id = uuid4()
+        self.mfq[id, file_path] = MediaFileState.WAITING
+        return self.mfq[id, file_path]

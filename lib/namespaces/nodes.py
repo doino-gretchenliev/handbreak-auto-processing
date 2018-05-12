@@ -2,7 +2,7 @@ import re
 
 from flask import jsonify, request
 from flask_restplus import Resource, Namespace, inputs, fields
-
+from lib.connection_manager import ConnectionManager
 from lib.nodes.node_state import NodeState
 
 TIME_RANGE_PATTERN = re.compile("^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]-([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$")
@@ -35,16 +35,16 @@ class Node(Resource):
 
     @api.doc(description='get information about all processing nodes')
     @api.expect(parser)
+    @ConnectionManager.connection(transaction=True)
     def get(self, id):
         args = self.parser.parse_args()
-        with ni.obtain_lock():
-            if id in ni:
-                response = jsonify(ni[id].dict(args.humanize))
-                response.status_code = 200
-            else:
-                response = jsonify(
-                    'Node [{}] not found'.format(id))
-                response.status_code = 404
+        if id in ni:
+            response = jsonify(ni[id].dict(args.humanize))
+            response.status_code = 200
+        else:
+            response = jsonify(
+                'Node [{}] not found'.format(id))
+            response.status_code = 404
         return response
 
     @api.doc(description="delete processing node(only if it's [{}])".format(NodeState.OFFLINE))

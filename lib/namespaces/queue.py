@@ -5,6 +5,7 @@ from flask_restplus import Resource, Namespace, inputs
 from humanize import naturalsize, naturaldelta, intcomma, apnumber, fractional
 
 from lib.media_file_state import MediaFileState
+from lib.connection_manager import ConnectionManager
 
 mp = None
 api = Namespace('queue', description='Control processing queue')
@@ -154,16 +155,16 @@ class QueueSize(Resource):
 
     @api.doc(description='get information about media file')
     @api.expect(parser)
+    @ConnectionManager.connection(transaction=True)
     def get(self, id):
         args = parser.parse_args()
-        with mp.mfq.obtain_lock():
-            if id in mp.mfq:
-                response = jsonify(mp.mfq[id].dict(args.humanize))
-                response.status_code = 200
-            else:
-                response = jsonify(
-                    'Node [{}] not found'.format(id))
-                response.status_code = 404
+        if id in mp.mfq:
+            response = jsonify(mp.mfq[id].dict(args.humanize))
+            response.status_code = 200
+        else:
+            response = jsonify(
+                'Node [{}] not found'.format(id))
+            response.status_code = 404
         return response
 
     @api.doc(description='retry a {} media file in processing queue'.format(MediaFileState.FAILED.value))

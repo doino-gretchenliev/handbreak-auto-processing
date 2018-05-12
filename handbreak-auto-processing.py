@@ -10,6 +10,7 @@ from os.path import expanduser
 from uuid import uuid4
 
 from watchdog.observers import Observer
+from peewee import SqliteDatabase
 
 from lib.event_handlers import MediaFilesEventHandler
 from lib.media_file_state import MediaFileState
@@ -18,6 +19,7 @@ from lib.nodes.node_state import NodeState
 from lib.nodes.nodes_inventory import NodeInventory
 from lib.persistent_media_files_queue import MediaFilesQueue
 from lib.rest_api import RestApi
+from lib.connection_manager import ConnectionManager
 
 DEFAULT_INCLUDE_PATTERN = ['*.mp4', '*.mpg', '*.mov', '*.mkv', '*.avi']
 SCAN_FOR_NEW_MEDIA_FILES_FOR_PROCESSING_TIMEOUT = 10
@@ -67,7 +69,7 @@ parser.add_argument('-s', '--case-sensitive', help='Whether pattern matching sho
 parser.add_argument('-z', '--silent-period',
                     help='A silent period(the media processing command will be suspended) defined as so: [18:45:20:45]. '
                          'You can provide multiple periods', action='append')
-parser.add_argument("-x", "--rest-api", action="store_true", default=False, help="Enable REST API on port 6000")
+parser.add_argument("-x", "--rest-api", action="store_true", default=False, help="Enable REST API on port 6767")
 
 parser.add_argument("-v", "--verbose", action='count', help="Enable verbose log output")
 parser.add_argument('-m', '--max-log-size', help='Max log size in MB; set to 0 to disable log file rotating\n'
@@ -131,6 +133,10 @@ media_processing_thread_logger = logging.getLogger(MediaProcessing.__module__)
 media_processing_thread_logger.handlers = logger.handlers
 media_processing_thread_logger.level = logger.level
 
+movie_files_queue_logger = logging.getLogger(MediaFilesQueue.__module__)
+movie_files_queue_logger.handlers = logger.handlers
+movie_files_queue_logger.level = logger.level
+
 media_files_event_handler_logger = logging.getLogger(MediaFilesEventHandler.__module__)
 media_files_event_handler_logger.handlers = logger.handlers
 media_files_event_handler_logger.level = logger.level
@@ -139,9 +145,16 @@ peewee_logger = logging.getLogger('peewee')
 peewee_logger.handlers = logger.handlers
 peewee_logger.level = peewee_logging_level
 
-queue_store_directory = os.path.join(queue_directory, '.handbreak-auto-processing')
-mfq = MediaFilesQueue(queue_store_directory, file_extension)
-nodes = NodeInventory(queue_store_directory)
+data_store_directory = os.path.join(queue_directory, '.handbreak-auto-processing')
+if not os.path.exists(data_store_directory):
+    os.mkdir(data_store_directory)
+
+database_file = os.path.join(data_store_directory, 'data.db')
+database = SqliteDatabase(database_file)
+ConnectionManager.register_database(database)
+
+mfq = MediaFilesQueue(file_extension)
+nodes = NodeInventory()
 
 rest_api = None
 observers_list = []
@@ -156,17 +169,23 @@ def clean_handler(signal, frame):
     for observer in observers_list:
         observer.stop()
         observer.join()
-    with nodes.obtain_lock():
-        if socket.gethostname() in nodes:
-            nodes[socket.gethostname()] = NodeState.OFFLINE
-        else:
-            nodes[uuid4(), socket.gethostname()] = NodeState.OFFLINE
+    toggle_node_state()
     exit(0)
 
 
+def toggle_node_state():
+    if socket.gethostname() in nodes:
+        current_state = nodes[socket.gethostname()].status
+        if current_state == NodeState.OFFLINE:
+            nodes[socket.gethostname()] = NodeState.ONLINE
+        else:
+            nodes[socket.gethostname()] = NodeState.OFFLINE
+    else:
+        nodes[uuid4(), socket.gethostname()] = NodeState.ONLINE
+
+
 if __name__ == "__main__":
-    node_id = uuid4()
-    nodes[node_id, socket.gethostname()] = NodeState.ONLINE
+    toggle_node_state()
     if silent_period:
         nodes.set_silent_periods(socket.gethostname(), silent_period)
 

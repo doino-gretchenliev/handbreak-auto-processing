@@ -1,11 +1,10 @@
 import datetime
 import json
 import logging
-import os
 
 import cpuinfo
-from peewee import SqliteDatabase
 
+from lib.connection_manager import ConnectionManager
 from lib.nodes.node import Node
 from lib.nodes.node import proxy
 from lib.nodes.node_state import NodeState
@@ -13,31 +12,21 @@ from lib.nodes.node_state import NodeState
 logger = logging.getLogger(__name__)
 
 
-def transaction(func):
-    def _execute(obj, *args, **kwargs):
-        with obj.obtain_lock():
-            return func(obj, *args, **kwargs)
-
-    return _execute
-
-
 class NodeInventory(object):
 
-    def __init__(self, path):
-        if not os.path.exists(path):
-            os.mkdir(path)
-        self.__database = SqliteDatabase(os.path.join(path, 'nodes.db'))
-        proxy.initialize(self.__database)
-        proxy.connect()
+    def __init__(self):
+        ConnectionManager.initialize_proxy(proxy)
+        self.__create_table()
+
+    @ConnectionManager.connection(transaction=True)
+    def __create_table(self):
         Node.create_table(True)
 
-    def obtain_lock(self):
-        return self.__database.atomic('EXCLUSIVE')
-
+    @ConnectionManager.connection
     def __len__(self):
         return Node.select().count()
 
-    @transaction
+    @ConnectionManager.connection(transaction=True)
     def __delitem__(self, key, safe=True):
         if isinstance(key, tuple):
             if safe:
@@ -51,7 +40,7 @@ class NodeInventory(object):
                 query = (Node.id == key) | (Node.hostname == key)
         Node.delete().where(query).execute()
 
-    @transaction
+    @ConnectionManager.connection(transaction=True)
     def __setitem__(self, key, status):
         now = datetime.datetime.now()
         set_fields = {'status': status}
@@ -79,6 +68,7 @@ class NodeInventory(object):
             else:
                 raise Exception('node doesn\'t exist, you must provide both id and hostname')
 
+    @ConnectionManager.connection
     def __getitem__(self, key):
         if isinstance(key, tuple):
             result = Node.select().where((Node.id == key[0]) & (Node.hostname == key[1])).limit(1)
@@ -86,21 +76,25 @@ class NodeInventory(object):
             result = Node.select().where((Node.id == key) | (Node.hostname == key)).limit(1)
         return result.first() if result else None
 
+    @ConnectionManager.connection
     def __repr__(self):
         result = []
         for node in Node.select().iterator():
             result.append(node)
         return "Nodes({})".format(result)
 
+    @ConnectionManager.connection
     def serialize(self):
         result = []
         for node in Node.select().iterator():
             result.append(node.dict())
         return result
 
+    @ConnectionManager.connection
     def __iter__(self):
         return Node.select().iterator()
 
+    @ConnectionManager.connection
     def __contains__(self, item):
         if isinstance(item, tuple):
             result = Node.select().where(Node.hostname == item[1]).exists()
@@ -120,12 +114,13 @@ class NodeInventory(object):
             result.append(node.status)
         return result
 
-    @transaction
+    @ConnectionManager.connection(transaction=True)
     def pop(self, status=None):
         result = self.peek(status)
         self.__delitem__(result.id)
         return result
 
+    @ConnectionManager.connection
     def peek(self, status=None):
         if status:
             result = Node.select().where(Node.status == status).first()
@@ -135,17 +130,18 @@ class NodeInventory(object):
             raise Exception('node not found')
         return result
 
-    @transaction
+    @ConnectionManager.connection(transaction=True)
     def clear(self, safe=True):
         if safe:
             Node.delete().where(Node.status != NodeState.ONLINE).execute()
         else:
             Node.delete().execute()
 
+    @ConnectionManager.connection
     def list(self, humanize=False):
         return [node.dict(humanize) for node in Node]
 
-    @transaction
+    @ConnectionManager.connection(transaction=True)
     def set_silent_periods(self, key, silent_periods):
         if self.__contains__(key):
             Node.update(silent_periods=json.dumps(silent_periods)).where(
@@ -153,14 +149,18 @@ class NodeInventory(object):
         else:
             raise Exception('node not found')
 
-    @transaction
+    @ConnectionManager.connection(transaction=True)
     def get_silent_periods(self, key):
         if self.__contains__(key):
-            return json.loads(Node.select().where((Node.id == key) | (Node.hostname == key)).first().silent_periods)
+            result = Node.select().where((Node.id == key) | (Node.hostname == key)).first()
+            if result:
+                return json.loads(result.silent_periods)
+            else:
+                raise Exception("no silent periods configured for node [{}]".format(key))
         else:
             raise Exception('node not found')
 
-    @transaction
+    @ConnectionManager.connection(transaction=True)
     def clear_silent_periods(self, key):
         if self.__contains__(key):
             Node.update(silent_periods=None).where(Node.id == key).execute()

@@ -7,7 +7,7 @@ class FlaskAppWrapper(Thread):
 
     def __init__(self, app, **kwargs):
         Thread.__init__(self, **kwargs)
-        self.srv = make_server('0.0.0.0', 6000, app)
+        self.srv = make_server('0.0.0.0', 6767, app)
         self.ctx = app.app_context()
         self.ctx.push()
 
