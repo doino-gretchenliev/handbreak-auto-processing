@@ -3,6 +3,6 @@ aenum==2.1.0
 python-dateutil==2.7.2
 schedule==0.5.0
 flask_restplus==0.10.1
-peewee=3.3.4
+peewee==3.3.4
 humanize==0.5.1
-py-cpuinfo=4.0.0
+py-cpuinfo==4.0.0
