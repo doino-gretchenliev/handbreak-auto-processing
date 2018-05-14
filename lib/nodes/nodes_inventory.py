@@ -1,6 +1,5 @@
 import datetime
 import json
-import logging
 
 import cpuinfo
 
@@ -8,8 +7,6 @@ from lib.connection_manager import ConnectionManager
 from lib.nodes.node import Node
 from lib.nodes.node import proxy
 from lib.nodes.node_state import NodeState
-
-logger = logging.getLogger(__name__)
 
 
 class NodeInventory(object):

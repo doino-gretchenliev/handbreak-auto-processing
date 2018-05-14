@@ -12,6 +12,7 @@ from uuid import uuid4
 from watchdog.observers import Observer
 from peewee import SqliteDatabase
 
+from lib.utils import configure_logging
 from lib.event_handlers import MediaFilesEventHandler
 from lib.media_file_state import MediaFileState
 from lib.media_processing import MediaProcessing
@@ -96,11 +97,11 @@ max_log_size = args.max_log_size
 max_log_file_to_keep = args.max_log_file_to_keep
 
 logging_level = logging.INFO
-peewee_logging_level = logging_level
+external_libs_logging_level = logging_level
 if args.verbose > 0:
     logging_level = logging.DEBUG
 if args.verbose > 1:
-    peewee_logging_level = logging_level
+    external_libs_logging_level = logging_level
 
 handbreak_command = args.handbreak_command
 handbreak_timeout = float(args.handbreak_timeout) * 60 * 60
@@ -114,36 +115,9 @@ reprocess = args.reprocess
 silent_period = args.silent_period
 enable_rest_api = args.rest_api
 
-# Logging setup
-formatter = logging.Formatter('[%(asctime)-15s] [%(threadName)s] [%(levelname)s]: %(message)s')
-
 logger = logging.getLogger(__name__)
-logger.setLevel(logging_level)
-syslog_handler = logging.StreamHandler(sys.stdout)
-file_handler = logging.handlers.RotatingFileHandler(filename='handbreak-auto-processing.log',
-                                                    maxBytes=max_log_size,
-                                                    backupCount=max_log_file_to_keep,
-                                                    encoding='utf-8')
-syslog_handler.setFormatter(formatter)
-file_handler.setFormatter(formatter)
-logger.addHandler(syslog_handler)
-logger.addHandler(file_handler)
-
-media_processing_thread_logger = logging.getLogger(MediaProcessing.__module__)
-media_processing_thread_logger.handlers = logger.handlers
-media_processing_thread_logger.level = logger.level
-
-movie_files_queue_logger = logging.getLogger(MediaFilesQueue.__module__)
-movie_files_queue_logger.handlers = logger.handlers
-movie_files_queue_logger.level = logger.level
-
-media_files_event_handler_logger = logging.getLogger(MediaFilesEventHandler.__module__)
-media_files_event_handler_logger.handlers = logger.handlers
-media_files_event_handler_logger.level = logger.level
-
-peewee_logger = logging.getLogger('peewee')
-peewee_logger.handlers = logger.handlers
-peewee_logger.level = peewee_logging_level
+configure_logging('handbreak-auto-processing.log', max_log_size, max_log_file_to_keep, logging_level,
+                  external_libs_logging_level)
 
 data_store_directory = os.path.join(queue_directory, '.handbreak-auto-processing')
 if not os.path.exists(data_store_directory):

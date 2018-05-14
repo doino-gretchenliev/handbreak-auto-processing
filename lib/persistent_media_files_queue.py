@@ -6,9 +6,7 @@ from lib.connection_manager import ConnectionManager
 from lib.media_file import MediaFile
 from lib.media_file import proxy
 from lib.media_file_state import MediaFileState
-
-logger = logging.getLogger(__name__)
-
+from lib import logger
 
 class MediaFilesQueue(object):
 

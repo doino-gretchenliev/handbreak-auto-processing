@@ -7,8 +7,7 @@ from watchdog.events import FileSystemEventHandler
 
 from lib.media_file_state import MediaFileState
 from lib.connection_manager import ConnectionManager
-
-logger = logging.getLogger(__name__)
+from lib import logger
 
 
 class MediaFilesEventHandler(FileSystemEventHandler):

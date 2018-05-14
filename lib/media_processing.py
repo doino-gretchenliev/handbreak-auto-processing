@@ -14,17 +14,12 @@ from lib.media_file_state import MediaFileState
 from lib.nodes.node_state import NodeState
 from lib.utils import compare_list
 from lib.connection_manager import ConnectionManager
-
+from lib import logger
 
 class MediaProcessing(object):
     SCAN_FOR_NEW_MEDIA_FILES_FOR_PROCESSING_TIMEOUT = 10
 
     def __init__(self, mfq, handbreak_command, handbreak_timeout, nodes, delete):
-        self.logger = logging.getLogger(__name__)
-        media_processing_thread_logger = logging.getLogger(MediaProcessingThread.__module__)
-        media_processing_thread_logger.handlers = self.logger.handlers
-        media_processing_thread_logger.level = self.logger.level
-
         self.mfq = mfq
 
         self.handbreak_command = handbreak_command
@@ -54,11 +49,11 @@ class MediaProcessing(object):
     @ConnectionManager.connection(transaction=True)
     def retry_media_files(self, media_file=None):
         if not media_file:
-            self.logger.info("Retrying all media files")
+            logger.info("Retrying all media files")
             for media_file in self.mfq:
                 self.mfq[media_file.id, media_file.file_path] = MediaFileState.WAITING
         else:
-            self.logger.info("Retrying [{}] media file".format(media_file))
+            logger.info("Retrying [{}] media file".format(media_file))
             self.mfq[media_file] = MediaFileState.WAITING
 
     def start(self):
@@ -117,10 +112,10 @@ class MediaProcessing(object):
                     schedule.every().day.at(starting_time.strftime("%H:%M")).do(self.__suspend_media_processing)
                     schedule.every().day.at(end_time.strftime("%H:%M")).do(self.__resume_media_processing)
                 self.last_silent_periods = periods
-                self.logger.debug("new silent periods rescheduled {}".format(periods))
+                logger.debug("new silent periods rescheduled {}".format(periods))
             schedule.run_pending()
         except Exception:
-            self.logger.debug('no silent periods configured')
+            logger.debug('no silent periods configured')
 
     def __suspend_media_processing(self):
         if self.system_call_thread:

@@ -1,3 +1,4 @@
+from lib import logger
 from flask import Flask, Blueprint
 from flask_restplus import Api
 
@@ -6,7 +7,7 @@ from lib.flask_thread import FlaskAppWrapper
 from lib.namespaces import nodes
 from lib.namespaces import queue
 
-app = Flask("ok")
+app = Flask(__name__)
 app.json_encoder = JSONEncoder
 app.config.SWAGGER_UI_JSONEDITOR = True
 

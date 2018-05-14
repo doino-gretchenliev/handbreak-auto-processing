@@ -3,7 +3,7 @@ aenum==2.1.0
 persist-queue==0.3.5
 python-dateutil==2.7.2
 schedule==0.5.0
-Flask==0.12.2
+Flask==0.12.4
 flask_restplus==0.10.1
 rsa==3.4.2
 peewee
